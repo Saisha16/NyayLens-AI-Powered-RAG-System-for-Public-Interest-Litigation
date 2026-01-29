@@ -54,8 +54,7 @@ NyayLens aims to **bridge the gap between news events and legal action** using A
               [ FRONTEND UI ]
            Download & View Report
 
-
----
+```
 
 ## 🧠 Technology Stack
 ---
