@@ -134,8 +134,9 @@ pip install -r requirements.txt
 ```bash
 uvicorn backend.api:app --reload
 ```
----
+
 ###🚀 Usage Flow
+---
 
 1. Submit a news URL or select an RSS feed
 
@@ -149,4 +150,34 @@ uvicorn backend.api:app --reload
 
 6. Download the final PIL as a PDF
 ---
+###🧪 Testing
+```bash
+pytest
+```
+
+###📌 Example Use Cases
+---
+- Legal aid organizations
+
+- Law students & researchers
+
+- NGOs monitoring public rights violations
+
+- Journalists & civic-tech platforms
+---
+###🎯 What This Project Demonstrates
+---
+- End-to-end AI system design
+
+- Real-world NLP application (not toy demos)
+
+- Backend + frontend integration
+
+- Legal-tech domain understanding
+
+- Clean, modular, scalable architecture
+
+---
+
+
 
