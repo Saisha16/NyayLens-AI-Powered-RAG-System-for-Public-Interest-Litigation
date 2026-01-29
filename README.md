@@ -1,11 +1,11 @@
 # NyayLens - AI-Powered Public Interest Litigation Generator
 
-> Automatically generate formal Public Interest Litigation (PIL) documents by analyzing news articles using Constitutional AI, NLP, and Legal RAG systems.
 
-![Python](https://img.shields.io/badge/Python-3.11+-blue)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green)
-![spaCy](https://img.shields.io/badge/spaCy-3.7+-success)
-![License](https://img.shields.io/badge/License-MIT-yellow)
+NyayLens is an end-to-end AI system that monitors public news sources, identifies potential public interest issues, maps them to constitutional rights and legal precedents, and generates structured **Public Interest Litigation (PIL) drafts** in a court-ready PDF format.
+
+This project focuses on **practical AI + system design**, not just models — combining NLP, semantic search, rule-based reasoning, and document generation.
+
+
 
 ## 🎯 What Is NyayLens?
 
@@ -36,11 +36,11 @@ pil26/
 │   ├── constitutional_db.py         # Legal database (rights, DPSPs, case laws)
 │   ├── vector_store.py              # Vector embeddings for semantic search
 │   ├── process_legal_docs.py        # Legal doc parsing
-│   ├── db_models.py                 # SQLAlchemy ORM models (new)
-│   ├── auth.py                      # JWT authentication (new)
-│   ├── config.py                    # Configuration management (new)
-│   ├── logger.py                    # Structured logging (new)
-│   ├── validators.py                # Input validation (new)
+│   ├── db_models.py                 # SQLAlchemy ORM models 
+│   ├── auth.py                      # JWT authentication 
+│   ├── config.py                    # Configuration management 
+│   ├── logger.py                    # Structured logging 
+│   ├── validators.py                # Input validation 
 │   └── tests/
 │       ├── test_nlp_pipeline.py
 │       ├── test_severity_scoring.py
@@ -49,16 +49,13 @@ pil26/
 │       └── conftest.py
 ├── frontend/
 │   ├── index.html
-│   ├── app.js
-│   ├── style.css
-│   └── react/                       # New React version (optional)
+│   ├── app.js│  
+│   └── style.css                       
 ├── data/
 │   ├── news/latest_news.json
 │   └── db.sqlite
 ├── requirements.txt
-├── .env.example
-├── docker-compose.yml               # (optional, not included per request)
-└── Dockerfile                       # (optional, not included per request)
+└── .env.example                    
 ```
 
 ---
@@ -68,9 +65,7 @@ pil26/
 ### Prerequisites
 - Python 3.11+
 - pip/venv
-- PostgreSQL 14+ (optional; defaults to SQLite)
-- Redis (optional; for caching)
-
+- 
 ### Installation
 
 ```bash
@@ -118,167 +113,21 @@ Once backend is running, visit: **http://localhost:8001/docs** (Swagger UI)
 
 NyayLens currently uses **transparent decision-making** rather than full XAI, with the following explainability features:
 
-#### ✅ **What We Currently Explain:**
-1. **Severity Scoring** - Transparent algorithm visible in logs
-   - Keyword match results with scores
+#### ✅ **What We Explain:**
+1. **Severity Scoring** 
+   - Explicit keyword matches with assigned weights
    - Population multiplier application (e.g., "minors: +1.3x")
    - Final normalized score (0-1)
    
-2. **Legal Reference Selection** - Traceable via RAG
-   - Semantic similarity scores (>30% threshold shown)
-   - Which constitutional articles matched
+2. **Legal Reference Selection(RAG)** 
+   - Semantic similarity scores 
+   - Exact constitutional articles matched
    - Case law citation sources
    
-3. **NER Entity Detection** - spaCy annotations
-   - Person/Organization/Location entities extracted
+3. **NER Entity Detection** 
+   - spaCy-based NER (persons, organizations, locations)
    - Confidence scores per entity
    - Entity linking to jurisdiction
-
-#### ❌ **What We DON'T Currently Explain (Gaps):**
-- Why specific keywords trigger severity (black-box weights)
-- How LLM (OpenAI) decides issue classification
-- Deep learning embedding reasoning (sentence-transformers)
-- Topic classification decision path
-
-### Implementing Full Explainable AI
-
-If you want to add true XAI capabilities, here's the roadmap:
-
-#### **Tier 1: LIME/SHAP Integration (Easy - 2-3 days)**
-```python
-# Explain NLP decision for specific article
-from lime.lime_text import LimeTextExplainer
-explainer = LimeTextExplainer(class_names=['crime', 'corruption', 'health', ...])
-
-# Get feature importance
-exp = explainer.explain_instance(
-    article_text,
-    classifier.predict_proba,
-    num_features=10
-)
-# Output: Words most important to classification decision
-```
-
-**Pros:** Simple, model-agnostic, good for NLP  
-**Cons:** Computationally expensive for real-time
-
-#### **Tier 2: Attention Visualization (Medium - 1 week)**
-```python
-# Visualize which parts of text the model focuses on
-# Use transformer attention heads from sentence-transformers
-# Show: "This phrase matched because..."
-
-# For severity scoring:
-# "Found 'rape' (0.90) + 'minor' (+1.3x) = 1.17 → capped at 1.0"
-```
-
-**Pros:** Interpretable, fast  
-**Cons:** Requires architectural changes
-
-#### **Tier 3: Counterfactual Explanations (Hard - 2-3 weeks)**
-```python
-# "If article removed 'murder', severity would be 0.45 instead of 0.85"
-# Uses model distillation + perturbation testing
-
-from alibi.explainers import Counterfactual
-explainer = Counterfactual(model, shape=(1, vocab_size))
-
-# Output: What-if scenarios for predictions
-```
-
-**Pros:** Most interpretable, business-friendly  
-**Cons:** Slow, requires training
-
-#### **Tier 4: Semantic Explanations (Advanced - 1 month)**
-```python
-# For RAG system: Explain why Article 21 matched
-# Generate human-readable explanation:
-# "Article 21 (Right to Life) matched your article about 
-#  police killing because semantic similarity was 0.67
-#  (above 0.30 threshold). Key matching phrases: 
-#  'death', 'law enforcement', 'constitutional violation'"
-
-from transformers import pipeline
-qa = pipeline("question-answering")
-qa({
-    'question': 'Why did this article match Article 21?',
-    'context': article_text
-})
-```
-
-**Pros:** End-to-end interpretability  
-**Cons:** Requires LLM API calls, slower
-
----
-
-### Recommended Implementation Plan
-
-**Phase 1 (Week 1):** Add LIME for severity scoring
-- New file: `backend/explainability/severity_explainer.py`
-- Endpoint: `GET /explain-severity?article_id=123`
-- Returns: Top 5 keywords driving the score
-
-**Phase 2 (Week 2):** Attention visualization for NER
-- New file: `backend/explainability/ner_visualizer.py`
-- Endpoint: `GET /explain-entities?article_id=123`
-- Returns: HTML heatmap of entity importance
-
-**Phase 3 (Week 3-4):** Counterfactual for PIL generation
-- New file: `backend/explainability/what_if_analysis.py`
-- Endpoint: `POST /what-if?article_id=123&modification=...`
-- Returns: How PIL changes with modified article
-
-**Phase 4 (Ongoing):** Semantic explanations for RAG
-- Enhance: `backend/rag_pipeline.py`
-- Add explanations to each legal reference
-- Frontend: Show "why matched" tooltip
-
----
-
-### Minimal XAI Implementation (Start Here - 1 day)
-
-If you want to start immediately without major refactoring:
-
-```python
-# backend/explainability/simple_explainer.py
-
-class SimpleExplainer:
-    def explain_severity(self, article_text, severity_score):
-        """Return human-readable explanation for severity score"""
-        explanation = {
-            "score": severity_score,
-            "keywords_found": [],
-            "multipliers_applied": [],
-            "reasoning": ""
-        }
-        
-        # Find which keywords triggered the score
-        for keyword in CRITICAL_KEYWORDS:
-            if keyword.lower() in article_text.lower():
-                explanation["keywords_found"].append(keyword)
-        
-        # Check for multipliers
-        if "minor" in article_text.lower():
-            explanation["multipliers_applied"].append("minors (+1.3x)")
-        
-        # Generate narrative
-        if severity_score >= 0.8:
-            explanation["reasoning"] = (
-                f"Critical severity: Found keywords {explanation['keywords_found']} "
-                f"with multipliers {explanation['multipliers_applied']}. "
-                f"This article likely qualifies for PIL."
-            )
-        
-        return explanation
-
-# Use in endpoint:
-@app.get("/explain-pil/{article_id}")
-def explain_pil_generation(article_id: int):
-    article = get_article(article_id)
-    severity = calculate_severity(article.text)
-    explainer = SimpleExplainer()
-    return explainer.explain_severity(article.text, severity)
-```
 
 ---
 
@@ -349,6 +198,7 @@ def explain_pil_generation(article_id: int):
     │ JSON (config)                 │
     └───────────────────────────────┘
 ```
+
 
 ---
 
@@ -558,22 +408,17 @@ DEFAULT_DAYS_BACK=7
 ## 🎓 Technical Stack
 
 | Component | Technology | Purpose |
-|-----------|-----------|---------|
-| **Backend Framework** | FastAPI 0.104+ | High-performance async API |
-| **NLP** | spaCy 3.7+ | Named entity recognition, classification |
-| **Text Processing** | newspaper3k | Article extraction from URLs |
-| **Feed Parsing** | feedparser | RSS/Atom parsing |
-| **Vector Search** | FAISS/HNSW | Semantic search on case laws |
-| **Database** | PostgreSQL + SQLAlchemy | Persistent data storage |
-| **Caching** | Redis | Performance optimization |
-| **PDF Generation** | reportlab | PIL document creation |
-| **Authentication** | JWT (PyJWT) | API security |
-| **Rate Limiting** | slowapi | DOS prevention |
-| **Error Tracking** | Sentry | Production monitoring |
-| **Logging** | Python logging | Structured logs |
-| **Testing** | pytest | Unit + integration tests |
-| **Frontend** | React 18 (new) | Modern UI framework |
-| **Real-Time** | WebSockets | Live status updates |
+|----------|-----------|---------|
+| Backend API | FastAPI | Core application & API layer |
+| NLP Engine | spaCy | Entity extraction & topic classification |
+| News Ingestion | feedparser, newspaper3k | RSS parsing & article text extraction |
+| Legal Search | FAISS / HNSW | Semantic retrieval of rights & case laws |
+| Database | PostgreSQL | Store articles, PIL drafts, metadata |
+| PDF Engine | reportlab | Generate court-ready PIL PDFs |
+| Authentication | JWT | Secure API access |
+| Real-Time Updates | WebSockets | Live PIL generation status |
+| Frontend | React / Vanilla JS | User interface |
+| Testing | pytest | Unit & integration testing |
 
 ---
 
@@ -616,26 +461,6 @@ Track emerging legal issues → analyze severity trends → generate policy brie
 
 ---
 
-## 🛣️ Roadmap
-
-- [x] Basic PIL generation from news
-- [x] Multi-source RSS aggregation
-- [x] NLP-based topic classification
-- [x] Constitutional RAG system
-- [x] Severity scoring algorithm
-- [x] LLM integration (OpenAI GPT-3.5)
-- [x] Lemmatization for severity matching
-- [x] PIL citation validator (SC/HC compliance)
-- [x] PostgreSQL migration service
-- [x] Hindi language support
-- [ ] **Explainable AI (LIME/SHAP) - Priority 🔴**
-- [ ] Real-time WebSocket updates
-- [ ] React frontend overhaul
-- [ ] Counterfactual explanations
-- [ ] Multi-jurisdiction support (UK, US courts)
-- [ ] Fact-checking integration
-- [ ] Automated legal document parsing
-- [ ] Mobile app (React Native)
 
 ---
 
