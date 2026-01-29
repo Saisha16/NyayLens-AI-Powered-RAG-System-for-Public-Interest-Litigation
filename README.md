@@ -176,4 +176,5 @@ This project is for educational and research purposes only. Generated PIL drafts
 
 ## 👩‍💻 Author
 
-**Isha Sahay** *AI / Full-Stack Developer* Focused on building real-world, impact-driven systems.
+**Isha Sahay** 
+*AI / Full-Stack Developer* Focused on building real-world, impact-driven systems.
