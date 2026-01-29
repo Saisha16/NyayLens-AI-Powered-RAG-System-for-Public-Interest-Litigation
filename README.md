@@ -134,6 +134,7 @@ pip install -r requirements.txt
 ```bash
 uvicorn backend.api:app --reload
 ```
+---
 ##🚀 Usage Flow
 
 1. **Input:** Submit a news URL or select a pre-configured RSS feed.
@@ -152,7 +153,7 @@ To run the test suite, execute:
 ```bash
 pytest
 ```
-
+---
 ##📌 Example Use Cases
 
 * **Legal Aid Organizations:** Streamlining the drafting of grievances for underserved communities.
