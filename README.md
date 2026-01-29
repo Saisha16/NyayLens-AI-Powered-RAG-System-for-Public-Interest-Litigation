@@ -110,9 +110,8 @@ pil26/
 │   └── db.sqlite
 ├── requirements.txt
 └── .env.example                    
----
-```
 
+```
 ---
 
 ## ⚙️ Installation & Setup
