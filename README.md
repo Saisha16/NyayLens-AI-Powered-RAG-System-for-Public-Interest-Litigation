@@ -121,5 +121,11 @@ pil26/
 ```bash
 git clone https://github.com/your-username/nyaylens.git
 cd nyaylens
+```
+###2️⃣ Create Virtual Environment
+```bash
+python -m venv venv
+source venv/bin/activate   # Windows: venv\Scripts\activate
+```
 
 ---
