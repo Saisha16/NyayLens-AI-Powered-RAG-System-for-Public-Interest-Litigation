@@ -12,6 +12,24 @@ from typing import Optional
 import re
 import html as html_unescape
 import requests
+import signal
+from contextlib import contextmanager
+
+# Timeout handler for article downloads
+class TimeoutException(Exception):
+    pass
+
+@contextmanager
+def timeout(seconds):
+    def signal_handler(signum, frame):
+        raise TimeoutException("Article download timeout")
+    # Set the signal handler and alarm
+    signal.signal(signal.SIGALRM, signal_handler)
+    signal.alarm(seconds)
+    try:
+        yield
+    finally:
+        signal.alarm(0)
 
 # Lazy-load spaCy with a lightweight pipeline; fall back to blank model on memory errors
 _nlp = None
@@ -38,43 +56,37 @@ def _get_nlp():
 
     return _nlp
 
-# Expanded RSS feeds (more sources)
+# Optimized RSS feeds (fast, reliable sources)
 RSS_FEEDS = [
-    # India
-    "https://feeds.feedburner.com/ndtvnews-top-stories",
+    # Major Indian National News
     "https://www.thehindu.com/news/national/feeder/default.rss",
     "https://indianexpress.com/section/india/feed/",
-    "https://www.hindustantimes.com/rss/topnews.xml",
     "https://timesofindia.indiatimes.com/rssfeedstopstories.cms",
-    "https://www.livemint.com/rss/news",
-    "https://economictimes.indiatimes.com/News/rssfeeds/4719148.cms",
-    "https://www.deccanherald.com/rss-feeds",
-    "https://www.business-standard.com/rss/",
-    # Global & business
-    "https://feeds.reuters.com/reuters/businessNews",
-    "https://feeds.reuters.com/Reuters/worldNews",
-    "https://www.aljazeera.com/xml/rss/all.xml",
-    "https://www.theguardian.com/world/rss",
-    "https://feeds.bbci.co.uk/news/world/rss.xml",
-    "https://rss.cnn.com/rss/edition_world.rss",
-    "https://apnews.com/hub/apf-topnews?output=atom",
-    "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
-    "https://www.ft.com/?format=rss",
-    # Tech & policy
-    "https://www.theverge.com/rss/index.xml",
-    "https://techcrunch.com/feed/",
-    "https://www.wired.com/feed/rss",
-    "https://www.bloomberg.com/feeds/podcasts/etf-report.xml",
+    
+    # Legal & Judicial News (critical for PIL)
+    "https://www.livelaw.in/feed",  # Legal news and court updates
+    "https://www.barandbench.com/feed",  # Legal journalism
+    
+    # Investigative & Social Issues
+    "https://thewire.in/feed",  # In-depth investigative reporting
+    "https://scroll.in/feeds/all",  # Long-form journalism
+    
+    # Additional Mainstream Sources
+    "https://www.ndtv.com/india-news/rss",  # NDTV India news
+    "https://www.news18.com/rss/india.xml",  # News18 India
+    
+    # Human Rights & Social Justice
+    "https://www.deccanherald.com/rss/national.xml",  # Deccan Herald
+    "https://www.business-standard.com/rss/home_page_top_stories.rss",  # Business Standard (policy news)
+    
+    # Additional Topic-Specific Feeds
+    "https://www.thehindu.com/news/cities/feeder/default.rss",  # City news (local issues)
+    "https://www.thehindu.com/sci-tech/energy-and-environment/feeder/default.rss",  # Environment
+    "https://indianexpress.com/section/cities/feed/",  # Cities section
 ]
 
 # Twitter/Nitter RSS feeds for rapid social updates (best-effort; may be blocked)
 TWITTER_RSS = [
-    "https://nitter.net/ndtv/rss",
-    "https://nitter.net/Reuters/rss",
-    "https://nitter.net/AP/rss",
-    "https://nitter.net/guardian/rss",
-    "https://nitter.net/nytimesworld/rss",
-    "https://nitter.net/cnnbrk/rss",
 ]
 
 # Enhanced topic keywords
@@ -248,29 +260,35 @@ def fetch_news(days_back: int = 7, max_per_feed: int = 10):
                         })
                         continue
 
-                    article = Article(entry.link)
-                    article.download()
-                    article.parse()
-                    
-                    topics = classify_topics_nlp(article.text)
-                    summary = extract_summary(article.text, max_sentences=3)
-                    
-                    articles.append({
-                        "id": str(uuid.uuid4()),
-                        "title": article.title,
-                        "text": article.text,
-                        "summary": summary,
-                        "topics": topics,
-                        "source": feed_url,
-                        "url": entry.link,
-                        "published": pub_date_str,
-                        "date": pub_date_str,
-                        "fetched_at": datetime.utcnow().isoformat()
-                    })
+                    try:
+                        article = Article(entry.link)
+                        article.download()
+                        article.parse()
+                        
+                        if not article.text or len(article.text.strip()) < 50:
+                            continue
+                        else:
+                            topics = classify_topics_nlp(article.text)
+                            summary = extract_summary(article.text, max_sentences=3)
+                            
+                            articles.append({
+                                "id": str(uuid.uuid4()),
+                                "title": article.title or entry.get("title", ""),
+                                "text": article.text,
+                                "summary": summary,
+                                "topics": topics,
+                                "source": feed_url,
+                                "url": entry.link,
+                                "published": pub_date_str,
+                                "date": pub_date_str,
+                                "fetched_at": datetime.utcnow().isoformat()
+                            })
+                    except Exception as e:
+                        print(f"Failed to parse {entry.link}: {e}")
                 except Exception:
-                    continue
+                    pass
         except Exception:
-            continue
+            pass
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
     base_dir = os.path.dirname(script_dir)
@@ -371,5 +389,5 @@ def add_custom_news(url: str, title: Optional[str] = None):
 
 
 if __name__ == "__main__":
-    # Fetch news from last 7 days
-    fetch_news(days_back=7, max_per_feed=10)
+    # Fetch news from last 30 days with more articles per feed
+    fetch_news(days_back=30, max_per_feed=20)

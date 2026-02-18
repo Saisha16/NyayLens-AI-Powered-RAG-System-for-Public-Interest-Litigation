@@ -2,6 +2,7 @@ fastapi
 uvicorn
 feedparser
 newspaper3k
+numpy<2
 spacy
 sentence-transformers
 faiss-cpu

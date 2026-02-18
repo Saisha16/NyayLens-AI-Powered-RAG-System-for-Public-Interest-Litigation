@@ -18,14 +18,17 @@ NyayLens aims to **bridge the gap between news events and legal action** using A
 ---
 ## ✨ Key Features
 
-- 📰 Automatic ingestion of news articles (RSS + URLs)
-- 🧠 NLP-based entity extraction and issue classification
-- ⚖️ Mapping issues to Fundamental Rights & legal domains
-- 🔎 Semantic search over case laws using vector embeddings
-- 🧾 Auto-generated PIL drafts (structured & editable)
-- 📄 Court-ready PDF generation
-- 🔐 Secure API with JWT authentication
-- 🔄 Real-time status updates via WebSockets
+- 📰 **Automatic news ingestion** from 14+ RSS feeds (legal, mainstream, investigative sources)
+- 🗓️ **Flexible date filtering** - Filter by year, month, specific date, or date range
+- 🧠 **NLP-based entity extraction** and intelligent issue classification
+- ⚖️ **Constitutional mapping** - Links issues to Fundamental Rights & legal domains
+- 🔎 **Semantic search** over 1,064 legal documents using vector embeddings
+- 🧾 **Auto-generated PIL drafts** - Structured, editable court documents
+- 📄 **Court-ready PDF generation** with proper legal citations
+- 🔐 **Secure JWT authentication** for API access
+- 🤖 **AI explainability** - Transparent reasoning for severity scoring and legal grounds
+- ⏰ **Automated scheduling** - Daily news updates at 08:00
+- 📝 **Custom article input** - Add articles from URLs or direct text
 
 ---
 ## 🏗️ System Architecture

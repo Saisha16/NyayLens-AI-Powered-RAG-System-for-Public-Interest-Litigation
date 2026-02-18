@@ -40,6 +40,48 @@ async function loadTopics() {
     }
 }
 
+function updateDateInput() {
+    const filterType = document.getElementById("dateFilterType").value;
+    const dateInputGroup = document.getElementById("dateInputGroup");
+    const dateFilter = document.getElementById("dateFilter");
+    const dateFilterEnd = document.getElementById("dateFilterEnd");
+    const dateInputLabel = document.getElementById("dateInputLabel");
+    
+    if (filterType === "all") {
+        dateInputGroup.style.display = "none";
+        dateFilter.value = "";
+        dateFilterEnd.value = "";
+    } else {
+        dateInputGroup.style.display = "block";
+        dateFilterEnd.style.display = "none";
+        
+        if (filterType === "year") {
+            dateInputLabel.textContent = "Year:";
+            dateFilter.type = "number";
+            dateFilter.placeholder = "YYYY (e.g., 2025)";
+            dateFilter.min = "2020";
+            dateFilter.max = "2030";
+            dateFilter.value = new Date().getFullYear();
+        } else if (filterType === "month") {
+            dateInputLabel.textContent = "Month:";
+            dateFilter.type = "month";
+            dateFilter.placeholder = "YYYY-MM";
+            dateFilter.value = new Date().toISOString().substring(0, 7);
+        } else if (filterType === "date") {
+            dateInputLabel.textContent = "Date:";
+            dateFilter.type = "date";
+            dateFilter.placeholder = "YYYY-MM-DD";
+            dateFilter.value = new Date().toISOString().split('T')[0];
+        } else if (filterType === "range") {
+            dateInputLabel.textContent = "From:";
+            dateFilter.type = "date";
+            dateFilter.placeholder = "Start Date";
+            dateFilterEnd.style.display = "inline-block";
+            dateFilterEnd.placeholder = "End Date";
+        }
+    }
+}
+
 async function loadNews() {
     if (!newsSelect) {
         console.error("newsSelect not initialized");
@@ -47,11 +89,23 @@ async function loadNews() {
     }
     
     const topicVal = topicSelect ? topicSelect.value || "" : "";
+    const filterType = document.getElementById("dateFilterType").value;
     const dateVal = document.getElementById("dateFilter").value || "";
+    const dateEndVal = document.getElementById("dateFilterEnd").value || "";
     
     let queryParams = [];
     if (topicVal) queryParams.push(`topic=${encodeURIComponent(topicVal)}`);
-    if (dateVal) queryParams.push(`date=${encodeURIComponent(dateVal)}`);
+    
+    // Handle different date filter types
+    if (filterType !== "all" && dateVal) {
+        if (filterType === "range" && dateEndVal) {
+            queryParams.push(`date_from=${encodeURIComponent(dateVal)}`);
+            queryParams.push(`date_to=${encodeURIComponent(dateEndVal)}`);
+        } else {
+            queryParams.push(`date=${encodeURIComponent(dateVal)}`);
+        }
+    }
+    
     const queryString = queryParams.length > 0 ? "?" + queryParams.join("&") : "";
     
     setStatus("Loading news...", "info");
@@ -806,6 +860,13 @@ function initialize() {
     console.log("newsSelect:", newsSelect ? "✓" : "✗");
     console.log("topicSelect:", topicSelect ? "✓" : "✗");
     
+    // Initialize date filter to "All Dates" by default
+    const dateFilterType = document.getElementById("dateFilterType");
+    if (dateFilterType) {
+        dateFilterType.value = "all";
+        updateDateInput(); // Initialize the UI
+    }
+    
     // Load initial data
     console.log("Starting initialization...");
     loadTopics().then(() => {
@@ -821,11 +882,27 @@ function initialize() {
         loadNews();
     });
     
+    // Date filter type listener
+    if (dateFilterType) {
+        dateFilterType.addEventListener("change", () => {
+            console.log("Date filter type changed");
+            updateDateInput();
+            loadNews();
+        });
+    }
+    
     // Date filter listener - reload news when date changes
     const dateFilter = document.getElementById("dateFilter");
+    const dateFilterEnd = document.getElementById("dateFilterEnd");
     if (dateFilter) {
         dateFilter.addEventListener("change", () => {
             console.log("Date filter changed to:", dateFilter.value);
+            loadNews();
+        });
+    }
+    if (dateFilterEnd) {
+        dateFilterEnd.addEventListener("change", () => {
+            console.log("Date end filter changed to:", dateFilterEnd.value);
             loadNews();
         });
     }

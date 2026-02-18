@@ -5,16 +5,20 @@ REM Double-click this file to start the project
 echo Starting NyayLens...
 echo.
 
+REM Get current directory and set Python path
+set "PROJECT_DIR=%~dp0"
+set "PYTHON_EXE=C:\Users\ISHA SAHAY\AppData\Local\Programs\Python\Python312\python.exe"
+
 REM Start Backend Server
 echo Starting Backend Server on http://localhost:8001...
-start "NyayLens Backend" cmd /k "cd /d D:\pil26 && D:\pil26\.venv\Scripts\python.exe -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8001"
+start "NyayLens Backend" cmd /k "cd /d "%PROJECT_DIR%" && "%PYTHON_EXE%" -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8001"
 
 REM Wait for backend to initialize
 timeout /t 3 /nobreak >nul
 
 REM Start Frontend Server  
 echo Starting Frontend Server on http://localhost:5500...
-start "NyayLens Frontend" cmd /k "cd /d D:\pil26\frontend && D:\pil26\.venv\Scripts\python.exe -m http.server 5500 --bind 127.0.0.1"
+start "NyayLens Frontend" cmd /k "cd /d "%PROJECT_DIR%frontend" && "%PYTHON_EXE%" -m http.server 5500 --bind 127.0.0.1"
 
 REM Wait for frontend to be ready
 timeout /t 2 /nobreak >nul

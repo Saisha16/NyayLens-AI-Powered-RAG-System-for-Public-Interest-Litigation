@@ -1,7 +1,12 @@
-from fastapi import FastAPI, Query, HTTPException, status, Body
+import logging
+from fastapi import FastAPI, Query, Body
+from threading import Thread
+from backend.scheduler import start_scheduler
+
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+
 import json
 import time
 import os
@@ -24,6 +29,8 @@ from backend.latex_pdf_generator import LatexPDFGenerator
 from backend.severity_scoring import calculate_severity
 from backend.ingest_news_enhanced import add_custom_news
 from backend.config import config
+from threading import Thread
+from backend.scheduler import start_scheduler
 # Ensure logs directory exists before logger setup
 os.makedirs("logs", exist_ok=True)
 from backend.logger import logger
@@ -52,6 +59,10 @@ app = FastAPI(
         "url": "https://opensource.org/licenses/MIT"
     }
 )
+
+# Start scheduler in background thread
+scheduler_thread = Thread(target=start_scheduler, daemon=True)
+scheduler_thread.start()
 
 # Rate limiting (optional)
 if Limiter and get_remote_address:
@@ -159,12 +170,19 @@ def login_for_access_token(username: str = Query(...), password: str = Query(...
 
 
 @app.get("/news")
-def list_news(topic: str | None = Query(None), date: str | None = Query(None)):
+def list_news(
+    topic: str | None = Query(None), 
+    date: str | None = Query(None),
+    date_from: str | None = Query(None),
+    date_to: str | None = Query(None)
+):
     """Return available news items with optional filtering by topic and date.
     
     Query params:
     - topic: Filter by topic (e.g., environment, health)
-    - date: Filter by published date (YYYY-MM-DD format)
+    - date: Filter by date (YYYY for year, YYYY-MM for month, YYYY-MM-DD for specific date)
+    - date_from: Start date for range filter (YYYY-MM-DD)
+    - date_to: End date for range filter (YYYY-MM-DD)
     """
     news_file = "data/news/latest_news.json"
     if not os.path.exists(news_file):
@@ -172,7 +190,7 @@ def list_news(topic: str | None = Query(None), date: str | None = Query(None)):
         return {"items": [], "total": 0}
 
     try:
-        logger.info(f"News endpoint accessed with topic={topic}, date={date}")
+        logger.info(f"News endpoint accessed with topic={topic}, date={date}, date_from={date_from}, date_to={date_to}")
         with open(news_file, "r", encoding="utf-8") as f:
             news = json.load(f)
 
@@ -183,12 +201,24 @@ def list_news(topic: str | None = Query(None), date: str | None = Query(None)):
             topic_lower = topic.lower()
             filtered = [n for n in filtered if topic_lower in [t.lower() for t in n.get("topics", [])]]
         
-        # Filter by date
+        # Filter by date (supports YYYY, YYYY-MM, or YYYY-MM-DD)
         if date:
             filtered = [n for n in filtered if (
                 n.get("date", "").startswith(date) or 
                 n.get("published", "").startswith(date)
             )]
+        
+        # Filter by date range
+        if date_from or date_to:
+            def get_date_str(item):
+                return item.get("date") or (item.get("published", "").split()[0] if item.get("published") else "")
+            
+            if date_from and date_to:
+                filtered = [n for n in filtered if date_from <= get_date_str(n) <= date_to]
+            elif date_from:
+                filtered = [n for n in filtered if date_from <= get_date_str(n)]
+            elif date_to:
+                filtered = [n for n in filtered if get_date_str(n) <= date_to]
 
         result = []
         for idx, item in enumerate(filtered):

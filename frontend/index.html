@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title>NyayLens — PIL Generator</title>
     <link rel="stylesheet" href="style.css">
+        <link rel="icon" type="image/x-icon" href="/favicon.ico">
 </head>
 <body>
 
@@ -16,8 +17,19 @@
     <div class="card">
         <div class="row">
             <div class="select-group">
-                <label for="dateFilter">Filter by Date:</label>
-                <input type="date" id="dateFilter" />
+                <label for="dateFilterType">Date Filter:</label>
+                <select id="dateFilterType">
+                    <option value="all" selected>All Dates</option>
+                    <option value="year">By Year</option>
+                    <option value="month">By Month</option>
+                    <option value="date">Specific Date</option>
+                    <option value="range">Date Range</option>
+                </select>
+            </div>
+            <div class="select-group" id="dateInputGroup" style="display: none;">
+                <label id="dateInputLabel" for="dateFilter">Select:</label>
+                <input type="text" id="dateFilter" placeholder="YYYY" />
+                <input type="date" id="dateFilterEnd" style="display: none;" placeholder="End Date" />
             </div>
             <div class="select-group">
                 <label for="topicSelect">Topic:</label>
