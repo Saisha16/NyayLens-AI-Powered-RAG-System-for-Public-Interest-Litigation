@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Logs
+logs/
+*.log
+
+# Cache
+.pytest_cache/
+.coverage
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local development
+start.bat
+start.ps1
+*.local
+
+# Documentation
+ARCHITECTURE.md
+TRAINING_GUIDE.md
+*.md
+!requirements.txt
+
+# Test data (exclude large datasets)
+data/eval_*.json
+data/fact2law_*.json

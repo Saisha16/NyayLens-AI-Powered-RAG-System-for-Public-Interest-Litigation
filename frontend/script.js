@@ -1,5 +1,5 @@
 // Resolve API base once so we can override without editing code
-const DEFAULT_API_URL = "http://127.0.0.1:8001";
+const DEFAULT_API_URL = "http://localhost:8001";
 function resolveApiBase() {
     const fromStorage = localStorage.getItem("api_base_url");
     const fromGlobal = typeof window !== "undefined" && window.API_URL ? window.API_URL : null;

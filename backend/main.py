@@ -73,13 +73,14 @@ else:
 
 # Allow local frontend (file://, localhost) to call the API
 # Handle wildcard CORS properly
-cors_origins = config.ALLOWED_ORIGINS if config.ALLOWED_ORIGINS != ["*"] else [
+cors_origins = [
     "http://localhost:5500",
     "http://127.0.0.1:5500",
     "http://localhost:8001",
     "http://127.0.0.1:8001",
     "http://localhost",
     "http://127.0.0.1",
+    "file://",
     "*"
 ]
 
@@ -89,6 +90,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_origin_regex=".*",
 )
 
 # Mount static files (frontend)

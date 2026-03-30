@@ -39,7 +39,7 @@
                 <label for="newsSelect">Choose an article:</label>
                 <select id="newsSelect"></select>
             </div>
-            <button class="small" onclick="loadNews()">Refresh News</button>
+            <button class="small" onclick="if(typeof loadNews==='function') loadNews(); else console.error('Script not loaded yet')">Refresh News</button>
         </div>
 
         <!-- Custom News Input Section -->
@@ -55,7 +55,7 @@
                 <div class="row">
                     <input type="text" id="customUrl" placeholder="Paste news article URL here..." />
                     <input type="text" id="customTitle" placeholder="Optional title (auto-detected if empty)" />
-                    <button class="small secondary" onclick="addCustomNews()">Add Article</button>
+                    <button class="small secondary" onclick="if(typeof addCustomNews==='function') addCustomNews(); else console.error('Script not loaded yet')">Add Article</button>
                 </div>
             </div>
             
@@ -88,7 +88,7 @@
                         <input type="text" id="customTopics" placeholder="e.g., crime, theft, property" />
                     </div>
                     
-                    <button class="small secondary" onclick="submitCustomArticle()">Generate PIL from Text</button>
+                    <button class="small secondary" onclick="if(typeof submitCustomArticle==='function') submitCustomArticle(); else console.error('Script not loaded yet')">Generate PIL from Text</button>
                 </div>
             </div>
         </div>
@@ -128,10 +128,10 @@
         </div>
 
         <div class="button-group">
-            <button onclick="generatePIL()" class="primary-action">⚡ Generate PIL</button>
-            <button onclick="viewPil()" class="secondary">📋 View & Edit PIL</button>
-            <button onclick="console.log('Button clicked!'); showExplainability();" class="secondary">🤖 AI Reasoning</button>
-            <button onclick="downloadPDF()" class="tertiary">⬇️ Download PDF</button>
+            <button onclick="if(typeof generatePIL==='function') generatePIL(); else console.error('Script not loaded yet')" class="primary-action">⚡ Generate PIL</button>
+            <button onclick="if(typeof viewPil==='function') viewPil(); else console.error('Script not loaded yet')" class="secondary">📋 View & Edit PIL</button>
+            <button onclick="if(typeof showExplainability==='function') showExplainability(); else console.error('Script not loaded yet')" class="secondary">🤖 AI Reasoning</button>
+            <button onclick="if(typeof downloadPDF==='function') downloadPDF(); else console.error('Script not loaded yet')" class="tertiary">⬇️ Download PDF</button>
         </div>
     </div>
 </div>
@@ -200,6 +200,6 @@
     </div>
 </div>
 
-<script src="script.js"></script>
+<script src="script.js" defer></script>
 </body>
 </html>

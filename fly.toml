@@ -1,0 +1,36 @@
+# fly.toml app configuration file generated for nyaylens
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+
+app = "nyaylens"
+primary_region = "sin"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8001"
+  PYTHONUNBUFFERED = "1"
+
+[http_service]
+  internal_port = 8001
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+[[http_service.checks]]
+  grace_period = "30s"
+  interval = "15s"
+  method = "GET"
+  timeout = "10s"
+  path = "/health"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512
+
+[mounts]
+  source = "nyaylens_data"
+  destination = "/app/data"
