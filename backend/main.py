@@ -158,6 +158,29 @@ def health_check():
         "version": "1.0.0"
     }
 
+@app.get("/debug/news-path")
+def debug_news_path():
+    """Debug endpoint to show resolved news file path and file status."""
+    news_file = get_news_file_path()
+    exists = os.path.exists(news_file)
+    size = os.path.getsize(news_file) if exists else 0
+    count = 0
+    if exists:
+        try:
+            with open(news_file) as f:
+                data = json.load(f)
+                count = len(data)
+        except Exception as e:
+            count = f"Error reading: {str(e)}"
+    
+    return {
+        "resolved_path": str(news_file),
+        "exists": exists,
+        "file_size_bytes": size,
+        "articles_count": count,
+        "current_working_directory": os.getcwd()
+    }
+
 @app.post("/token")
 def login_for_access_token(username: str = Query(...), password: str = Query(...)):
     """
