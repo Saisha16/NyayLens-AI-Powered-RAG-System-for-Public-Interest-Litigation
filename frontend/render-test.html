@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Render Production Test</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .section {
+            background: white;
+            border-left: 4px solid #007bff;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 { color: #333; }
+        h2 { color: #007bff; margin-top: 0; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px 5px 10px 0;
+            font-size: 14px;
+        }
+        button:hover { background: #0056b3; }
+        .success { color: green; font-weight: bold; }
+        .error { color: red; font-weight: bold; }
+        .info { color: #007bff; font-weight: bold; }
+        pre {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        #results {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            min-height: 50px;
+        }
+        .field {
+            margin: 8px 0;
+            padding: 8px;
+            background: white;
+            border-left: 3px solid #28a745;
+        }
+    </style>
+</head>
+<body>
+    <h1>⚖️ NyayLens Render Production Testing</h1>
+    
+    <!-- Health Check -->
+    <div class="section">
+        <h2>1. Backend Health Check</h2>
+        <p>Test if the backend is online and responding</p>
+        <button onclick="testHealth()">Test /health Endpoint</button>
+        <div id="healthResults"></div>
+    </div>
+
+    <!-- Generate PIL -->
+    <div class="section">
+        <h2>2. Generate PIL - Test Display</h2>
+        <p>Test if backend generates PIL and returns all required fields</p>
+        <button onclick="testGeneratePIL()">Test /generate-pil?idx=0</button>
+        <div id="pilResults"></div>
+    </div>
+
+    <!-- Frontend Integration -->
+    <div class="section">
+        <h2>3. Frontend Integration Test</h2>
+        <p>Check if your frontend can access and display the data</p>
+        <button onclick="testFrontendIntegration()">Test Frontend Display</button>
+        <div id="frontendResults"></div>
+    </div>
+
+    <!-- Manual Test -->
+    <div class="section">
+        <h2>4. Manual Frontend Test</h2>
+        <p>Open the main NyayLens page and check browser console (F12 → Console)</p>
+        <button onclick="window.open('https://nyaylens-backend.onrender.com/', '_blank')">
+            Open Main Page
+        </button>
+        <button onclick="window.open('https://nyaylens-backend.onrender.com/test-display.html', '_blank')">
+            Open Display Test Page
+        </button>
+        <p style="font-size: 12px; color: #666;">
+            After opening, click "Generate PIL" and look for console logs starting with 🚀
+        </p>
+    </div>
+
+    <script>
+    async function testHealth() {
+        const div = document.getElementById('healthResults');
+        div.innerHTML = '<p class="info">Testing...</p>';
+        
+        try {
+            const resp = await fetch('https://nyaylens-backend.onrender.com/health', {
+                method: 'GET',
+                mode: 'cors'
+            });
+            
+            div.innerHTML = `
+                <p class="success">✓ Backend Online</p>
+                <div class="field">Status Code: ${resp.status}</div>
+                <div class="field">Status Text: ${resp.statusText}</div>
+                <p>Response:</p>
+                <pre>${await resp.text()}</pre>
+            `;
+        } catch(err) {
+            div.innerHTML = `<p class="error">✗ Error: ${err.message}</p>`;
+        }
+    }
+
+    async function testGeneratePIL() {
+        const div = document.getElementById('pilResults');
+        div.innerHTML = '<p class="info">Testing...</p>';
+        
+        try {
+            const resp = await fetch('https://nyaylens-backend.onrender.com/generate-pil?idx=0', {
+                method: 'GET',
+                mode: 'cors'
+            });
+            
+            if (!resp.ok) {
+                throw new Error(`HTTP ${resp.status}: ${await resp.text()}`);
+            }
+            
+            const data = await resp.json();
+            
+            div.innerHTML = `
+                <p class="success">✓ API Returned Data</p>
+                <div class="field"><strong>Title:</strong> ${data.news_title || 'N/A'}</div>
+                <div class="field"><strong>Severity:</strong> ${data.severity_score} → ${(data.severity_score * 10).toFixed(1)} / 10</div>
+                <div class="field"><strong>Priority:</strong> ${data.priority_level}</div>
+                <div class="field"><strong>Topics:</strong> ${(data.topics || []).join(', ')}</div>
+                <div class="field"><strong>Entities:</strong> ${(data.entities || []).length} detected</div>
+                <div class="field"><strong>Draft ID:</strong> ${data.draft_id}</div>
+                <p>Full Response (first 1000 chars):</p>
+                <pre>${JSON.stringify(data, null, 2).substring(0, 1000)}</pre>
+            `;
+        } catch(err) {
+            div.innerHTML = `<p class="error">✗ Error: ${err.message}</p>`;
+        }
+    }
+
+    async function testFrontendIntegration() {
+        const div = document.getElementById('frontendResults');
+        div.innerHTML = `
+            <p class="info">Frontend Integration Guide:</p>
+            <ol>
+                <li>Go to <a href="https://nyaylens-backend.onrender.com/" target="_blank">Main NyayLens Page</a></li>
+                <li>Press <strong>F12</strong> to open Developer Tools</li>
+                <li>Click the <strong>Console</strong> tab</li>
+                <li>Click the <strong>"⚡ Generate PIL"</strong> button on the page</li>
+                <li>Look for these console logs (in order):
+                    <ul>
+                        <li><strong>🚀 generatePIL started</strong> - Function was called</li>
+                        <li><strong>📡 Fetching:</strong> URL being called</li>
+                        <li><strong>✅ PIL data received</strong> - Response arrived</li>
+                        <li><strong>🔍 DOM Elements Status</strong> - Elements found/missing</li>
+                        <li><strong>✓ Title updated</strong> - Title is displaying</li>
+                        <li><strong>✓ Severity updated</strong> - Severity is displaying</li>
+                        <li><strong>✓ Priority updated</strong> - Priority is displaying</li>
+                        <li><strong>✓ Topics updated</strong> - Topics are displaying</li>
+                        <li><strong>🎉 generatePIL completed successfully</strong> - All done!</li>
+                    </ul>
+                </li>
+                <li>Check the page above Console for displayed data:
+                    <ul>
+                        <li>Title should appear</li>
+                        <li>Severity Score should show (e.g., "4.5 / 10")</li>
+                        <li>Priority should show (e.g., "MEDIUM")</li>
+                        <li>Topics should show</li>
+                        <li>Entities list should be populated</li>
+                    </ul>
+                </li>
+            </ol>
+            <hr>
+            <p><strong>If Elements Show "NOT FOUND":</strong></p>
+            <ul>
+                <li>Clear browser cache: Ctrl+Shift+Delete → "All time"</li>
+                <li>Reload page: F5</li>
+                <li>Check that script.js loaded (look for "Init: Elements initialized")</li>
+                <li>Screenshot the console and share</li>
+            </ul>
+        `;
+    }
+    </script>
+</body>
+</html>
