@@ -387,16 +387,16 @@ def run_with_timeout(func, timeout_seconds, *args, **kwargs):
 
 
 @app.get("/generate-pil")
-def generate_pil_from_news(idx: int = Query(0, ge=0), topic: str | None = Query(None), lite: bool = Query(False)):
-    """Generate PIL from news article (with timeout protection for free tier).
+def generate_pil_from_news(idx: int = Query(0, ge=0), topic: str | None = Query(None), full_rag: bool = Query(False)):
+    """Generate PIL from news article.
     
     Args:
         idx: Article index
         topic: Filter by topic
-        lite: If True, use lightweight mode (faster, less memory) - skip RAG + entity extraction
+        full_rag: If True, use full RAG pipeline (slower, needs more memory). Default: Fast mode
     """
     try:
-        logger.info(f"PIL generation started for article idx={idx}, topic={topic}, lite={lite}")
+        logger.info(f"PIL generation started for article idx={idx}, topic={topic}, full_rag={full_rag}")
         
         news_file = get_news_file_path()
         if not os.path.exists(news_file):
@@ -418,13 +418,89 @@ def generate_pil_from_news(idx: int = Query(0, ge=0), topic: str | None = Query(
         all_texts = [n["text"] for n in news]
         article_topics = article.get("topics", ["general"])
 
-        logger.info(f"Starting PIL processing for article {idx} (lite mode: {lite})")
+        logger.info(f"Starting PIL processing for article {idx} (full_rag: {full_rag})")
         start_time = time.time()
 
         try:
-            if lite:
-                # Lite mode: skip intensive NLP, use template-based PIL
-                logger.info("Using LITE mode - skipping heavy NLP processing")
+            if full_rag:
+                # FULL RAG MODE: Complete NLP processing with timeout protection
+                logger.info("Using FULL RAG mode - running complete NLP pipeline with 25s timeout (may timeout on free tier)")
+                
+                def run_nlp():
+                    nonlocal issue, severity, legal_sections, pil_draft_text
+                    
+                    issue = extract_issue(article["text"])
+                    logger.info(f"✓ Issue extracted: {issue['issue_summary'][:80]}")
+                    
+                    severity = calculate_severity(article["text"], all_texts)
+                    logger.info(f"✓ Severity calculated: {severity}")
+                    
+                    legal_sections = retrieve_legal_sections(
+                        issue["issue_summary"], 
+                        topics=article_topics,
+                        entities=issue["entities"]
+                    )
+                    logger.info(f"✓ Retrieved {len(legal_sections)} legal sections")
+                    
+                    pil_draft_text = generate_pil(
+                        issue, 
+                        legal_sections,
+                        topics=article_topics,
+                        news_title=article["title"],
+                        severity_score=severity
+                    )
+                    logger.info(f"✓ PIL generated successfully")
+                
+                try:
+                    run_with_timeout(run_nlp, timeout_seconds=25)
+                    lite = False
+                except TimeoutError as te:
+                    logger.error(f"NLP pipeline timeout after 25s: {str(te)}")
+                    logger.info("Timeout on free tier - falling back to LITE mode (template-based)")
+                    lite = True
+                    # Re-run lite mode logic
+                    try:
+                        severity = calculate_severity(article["text"], all_texts)
+                    except Exception as e:
+                        logger.warning(f"Severity calculation skipped: {e}")
+                        severity = 0.5
+                    
+                    legal_sections = [
+                        {"category": "Fundamental Right", "source": "Article 21 - Right to Life", "detail": "Protection of life and personal liberty"},
+                        {"category": "Fundamental Right", "source": "Article 14 - Equality", "detail": "Equality before law"},
+                    ]
+                    
+                    issue = {
+                        "issue_summary": article.get("summary", article["text"][:200]),
+                        "entities": article_topics
+                    }
+                    
+                    pil_draft_text = f"""
+## {article.get('title', 'Public Interest Matter')}
+
+**Nature of Issue:** {', '.join(article_topics)}
+
+### Facts of the Case
+{article.get('summary', article['text'][:500])}
+
+### Grounds for PIL
+- Violation of fundamental rights as guaranteed by the Constitution
+- Matter of public interest requiring judicial intervention
+
+### Relief Sought
+1. Appropriate action by the concerned authorities
+2. Compensation to affected parties where applicable
+3. Implementation of preventive measures
+
+### Case Precedents
+- S.P. Gupta v. Union of India – Expanded locus standi in PIL
+- Bandhua Mukti Morcha v. Union of India – Epistolary jurisdiction
+"""
+                
+            else:
+                # LITE MODE: Template-based PIL (default for free tier stability)
+                logger.info("Using LITE mode - template-based PIL generation (fast, stable on free tier)")
+                lite = True
                 
                 # Just extract severity without full NLP
                 try:
@@ -466,75 +542,6 @@ def generate_pil_from_news(idx: int = Query(0, ge=0), topic: str | None = Query(
 ### Case Precedents
 - S.P. Gupta v. Union of India – Expanded locus standi in PIL
 - Bandhua Mukti Morcha v. Union of India – Epistolary jurisdiction
-"""
-                
-            else:
-                # Full mode: complete NLP processing with timeout protection
-                logger.info("Using FULL mode - running complete NLP pipeline with 25s timeout")
-                
-                def run_nlp():
-                    nonlocal issue, severity, legal_sections, pil_draft_text
-                    
-                    issue = extract_issue(article["text"])
-                    logger.info(f"✓ Issue extracted: {issue['issue_summary'][:80]}")
-                    
-                    severity = calculate_severity(article["text"], all_texts)
-                    logger.info(f"✓ Severity calculated: {severity}")
-                    
-                    legal_sections = retrieve_legal_sections(
-                        issue["issue_summary"], 
-                        topics=article_topics,
-                        entities=issue["entities"]
-                    )
-                    logger.info(f"✓ Retrieved {len(legal_sections)} legal sections")
-                    
-                    pil_draft_text = generate_pil(
-                        issue, 
-                        legal_sections,
-                        topics=article_topics,
-                        news_title=article["title"],
-                        severity_score=severity
-                    )
-                    logger.info(f"✓ PIL generated successfully")
-                
-                try:
-                    run_with_timeout(run_nlp, timeout_seconds=25)
-                except TimeoutError as te:
-                    logger.error(f"NLP pipeline timeout: {str(te)}")
-                    # Fallback to lite mode
-                    logger.info("Falling back to LITE mode due to timeout")
-                    lite = True
-                    # Re-run lite mode logic
-                    try:
-                        severity = calculate_severity(article["text"], all_texts)
-                    except Exception as e:
-                        severity = 0.5
-                    
-                    legal_sections = [
-                        {"category": "Fundamental Right", "source": "Article 21 - Right to Life", "detail": "Protection of life and personal liberty"},
-                        {"category": "Fundamental Right", "source": "Article 14 - Equality", "detail": "Equality before law"},
-                    ]
-                    
-                    issue = {
-                        "issue_summary": article.get("summary", article["text"][:200]),
-                        "entities": article_topics
-                    }
-                    
-                    pil_draft_text = f"""
-## {article.get('title', 'Public Interest Matter')}
-
-**Nature of Issue:** {', '.join(article_topics)}
-
-### Facts of the Case
-{article.get('summary', article['text'][:500])}
-
-### Grounds for PIL
-- Violation of fundamental rights as guaranteed by the Constitution
-- Matter of public interest requiring judicial intervention
-
-### Relief Sought
-1. Appropriate action by the concerned authorities
-2. Compensation to affected parties where applicable
 """
             
             elapsed = time.time() - start_time
