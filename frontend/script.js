@@ -997,6 +997,8 @@ function attachNewsSelectListener() {
 }
 
 function initialize() {
+    console.log("🎯 initialize() called");
+    
     // Initialize DOM element references
     statusEl = document.getElementById("status");
     newsSelect = document.getElementById("newsSelect");
@@ -1142,74 +1144,106 @@ function initialize() {
         });
     });
     
-    // Setup main action button listeners
-    const btnGeneratePIL = document.getElementById('btnGeneratePIL');
-    const btnViewPIL = document.getElementById('btnViewPIL');
-    const btnExplainability = document.getElementById('btnExplainability');
-    const btnDownloadPDF = document.getElementById('btnDownloadPDF');
-    const btnRefreshNews = document.getElementById('btnRefreshNews');
-    const btnAddCustomArticle = document.getElementById('btnAddCustomArticle');
-    const btnSubmitCustomArticle = document.getElementById('btnSubmitCustomArticle');
+    // Setup main action button listeners - WITH DETAILED LOGGING
+    const btnElements = {
+        btnGeneratePIL: 'btnGeneratePIL',
+        btnViewPIL: 'btnViewPIL',
+        btnExplainability: 'btnExplainability',
+        btnDownloadPDF: 'btnDownloadPDF',
+        btnRefreshNews: 'btnRefreshNews',
+        btnAddCustomArticle: 'btnAddCustomArticle',
+        btnSubmitCustomArticle: 'btnSubmitCustomArticle'
+    };
     
-    if (btnGeneratePIL) {
-        btnGeneratePIL.addEventListener('click', () => {
-            console.log("🔘 Generate PIL button clicked");
-            generatePIL();
-        });
-    }
+    console.log("🔘 Setting up button listeners...");
     
-    if (btnViewPIL) {
-        btnViewPIL.addEventListener('click', () => {
-            console.log("🔘 View PIL button clicked");
-            viewPil();
-        });
-    }
-    
-    if (btnExplainability) {
-        btnExplainability.addEventListener('click', () => {
-            console.log("🔘 Explainability button clicked");
-            showExplainability();
-        });
-    }
-    
-    if (btnDownloadPDF) {
-        btnDownloadPDF.addEventListener('click', () => {
-            console.log("🔘 Download PDF button clicked");
-            downloadPDF();
-        });
-    }
-    
-    if (btnRefreshNews) {
-        btnRefreshNews.addEventListener('click', () => {
-            console.log("🔘 Refresh News button clicked");
-            loadNews();
-        });
-    }
-    
-    if (btnAddCustomArticle) {
-        btnAddCustomArticle.addEventListener('click', () => {
-            console.log("🔘 Add Custom Article button clicked");
-            if (typeof addCustomNews === 'function') {
-                addCustomNews();
-            } else {
-                console.warn("⚠️ addCustomNews function not defined yet");
-            }
-        });
-    }
-    
-    if (btnSubmitCustomArticle) {
-        btnSubmitCustomArticle.addEventListener('click', () => {
-            console.log("🔘 Submit Custom Article button clicked");
-            submitCustomArticle();
-        });
+    for (const [key, id] of Object.entries(btnElements)) {
+        const btn = document.getElementById(id);
+        console.log(`Button "${id}": ${btn ? '✓ FOUND' : '✗ NOT FOUND'}`);
+        
+        if (!btn) continue;
+        
+        // Attach click listeners based on button type
+        if (id === 'btnGeneratePIL') {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                console.log("🔘 [CLICK] Generate PIL button clicked");
+                generatePIL();
+            });
+        } else if (id === 'btnViewPIL') {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                console.log("🔘 [CLICK] View PIL button clicked");
+                viewPil();
+            });
+        } else if (id === 'btnExplainability') {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                console.log("🔘 [CLICK] Explainability button clicked");
+                showExplainability();
+            });
+        } else if (id === 'btnDownloadPDF') {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                console.log("🔘 [CLICK] Download PDF button clicked");
+                downloadPDF();
+            });
+        } else if (id === 'btnRefreshNews') {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                console.log("🔘 [CLICK] Refresh News button clicked");
+                loadNews();
+            });
+        } else if (id === 'btnAddCustomArticle') {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                console.log("🔘 [CLICK] Add Custom Article button clicked");
+                if (typeof addCustomNews === 'function') {
+                    addCustomNews();
+                } else {
+                    console.warn("⚠️ addCustomNews function not defined");
+                }
+            });
+        } else if (id === 'btnSubmitCustomArticle') {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                console.log("🔘 [CLICK] Submit Custom Article button clicked");
+                submitCustomArticle();
+            });
+        }
     }
     
     console.log("✅ All button listeners attached");
+    console.log("🎉 Initialize() complete");
 }
 
 // Robust bootstrap: run immediately if DOM already ready, else wait
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initialize);
-} else {
-    initialize();
+console.log("🔧 Script loading, document.readyState:", document.readyState);
+
+function attemptInitialize() {
+    try {
+        console.log("🚀 Initialize function starting...");
+        initialize();
+        console.log("✅ Initialize function completed");
+    } catch (err) {
+        console.error("❌ Initialize function error:", err);
+        console.error("Stack:", err.stack);
+    }
 }
+
+if (document.readyState === 'loading') {
+    console.log("📄 DOM still loading, waiting for DOMContentLoaded...");
+    document.addEventListener('DOMContentLoaded', attemptInitialize);
+} else {
+    console.log("✓ DOM already loaded, running initialize immediately");
+    attemptInitialize();
+}
+
+// Also try initializing after a short delay as fallback
+setTimeout(() => {
+    if (typeof generatePIL === 'function') {
+        console.log("✓ Functions available (functions exist)");
+    } else {
+        console.warn("⚠️ Functions not available yet!");
+    }
+}, 500);
