@@ -76,6 +76,24 @@ def get_news_file_path():
     # Default to strategy 1 path (even if it doesn't exist yet)
     return path1
 
+def ensure_news_file_exists():
+    """Ensure news file exists. Create it from template if necessary."""
+    news_file = get_news_file_path()
+    
+    if os.path.exists(news_file) and os.path.getsize(news_file) > 10:
+        # File exists and has content
+        return
+    
+    # Create parent directories if they don't exist
+    os.makedirs(os.path.dirname(news_file), exist_ok=True)
+    
+    # Try to load from a backup location or embedded
+    # For now, create an empty array to  allow the app to run
+    # The scheduler will populate it on next daily run
+    with open(news_file, 'w') as f:
+        json.dump([], f)
+    logger.info(f"Initialized empty news file at {news_file}")
+
 app = FastAPI(
     title=config.API_TITLE,
     version=config.API_VERSION,
@@ -89,6 +107,13 @@ app = FastAPI(
         "url": "https://opensource.org/licenses/MIT"
     }
 )
+
+# Startup event: Ensure news file exists
+@app.on_event("startup")
+async def startup_events():
+    """Initialize required files and background tasks on app startup."""
+    ensure_news_file_exists()
+    logger.info("Startup events completed")
 
 # Start scheduler in background thread
 scheduler_thread = Thread(target=start_scheduler, daemon=True)
