@@ -61,6 +61,7 @@ test_output.pdf
 # Data files (if they contain user data)
 data/pil_drafts/
 data/news/
+!data/news/*.json  # Allow committing news JSON files for deployment
 data/current_pil.json
 
 # System files
