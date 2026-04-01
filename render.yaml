@@ -7,7 +7,10 @@ services:
     plan: free
     buildCommand: >
       pip install -r requirements.txt &&
-      echo "✅ Dependencies installed. spaCy model will download on first startup."
+      echo "📥 Pre-downloading spaCy model..." &&
+      timeout 300 python -m spacy download en_core_web_sm 2>&1 | tail -5 ||
+      echo "⚠️  spaCy download may have timed out, app will attempt on startup" &&
+      echo "✅ Build complete"
     startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
