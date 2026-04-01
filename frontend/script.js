@@ -364,66 +364,113 @@ async function generatePIL(idx = null, auto = false) {
         console.log("📡 Fetching:", url);
         
         const response = await fetch(url, { headers });
+        console.log("📞 API Response Status:", response.status);
+        
         if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
+            const errorText = await response.text();
+            throw new Error(`HTTP ${response.status}: ${errorText.substring(0, 200)}`);
         }
         const data = await response.json();
-        console.log("✅ PIL data received:", data);
+        console.log("✅ PIL data received:", {
+            keys: Object.keys(data),
+            title: data.news_title,
+            severity: data.severity_score,
+            priority: data.priority_level,
+            entities_count: (data.entities || []).length
+        });
+
+        // Diagnostic: Check if elements exist
+        const elements = {
+            title: document.getElementById("newsTitle"),
+            severity: document.getElementById("severityScore"),
+            priority: document.getElementById("priorityLevel"),
+            topics: document.getElementById("topics"),
+            entityList: document.getElementById("entityList"),
+            excerpt: document.getElementById("excerpt"),
+            summary: document.getElementById("summary")
+        };
+        
+        console.log("🔍 DOM Elements Status:", Object.entries(elements).reduce((acc, [k, el]) => {
+            acc[k] = el ? "FOUND" : "NOT FOUND";
+            return acc;
+        }, {}));
 
         // Update Title
-        const titleEl = document.getElementById("newsTitle");
-        if (titleEl) {
-            titleEl.innerText = data.news_title || "No title";
+        if (elements.title) {
+            elements.title.innerText = data.news_title || "No title";
             console.log("✓ Title updated:", data.news_title);
+        } else {
+            console.warn("⚠️ Title element not found!");
         }
         
         // Display severity score - show as score/10 format
-        const severityEl = document.getElementById("severityScore");
-        if (severityEl) {
-            severityEl.innerText = typeof data.severity_score === 'number' 
+        if (elements.severity) {
+            elements.severity.innerText = typeof data.severity_score === 'number' 
                 ? (data.severity_score * 10).toFixed(1) + " / 10" 
                 : "—";
             console.log("✓ Severity updated:", data.severity_score);
+        } else {
+            console.warn("⚠️ Severity element not found!");
         }
 
-        // Display summary/excerpt
-        if (excerptEl) {
-            excerptEl.textContent = data.summary || data.excerpt || "—";
+        // Display summary from summary field
+        if (elements.summary) {
+            elements.summary.textContent = data.summary || "—";
+            console.log("✓ Summary updated");
+        } else {
+            console.warn("⚠️ Summary element not found!");
+        }
+
+        // Display summary/excerpt (fallback)
+        if (elements.excerpt) {
+            elements.excerpt.textContent = data.excerpt || (data.summary ? data.summary.substring(0, 200) : "—");
             console.log("✓ Excerpt updated");
+        } else {
+            console.warn("⚠️ Excerpt element not found!");
         }
         
-        if (data.news_index !== undefined) {
+        if (data.news_index !== undefined && newsSelect) {
             newsSelect.value = data.news_index;
         }
 
         // Display priority level with color coding
-        const priority = document.getElementById("priorityLevel");
-        if (priority) {
-            priority.innerText = data.priority_level || "—";
-            priority.className = (data.priority_level || "").toUpperCase();
+        if (elements.priority) {
+            elements.priority.innerText = data.priority_level || "—";
+            elements.priority.className = (data.priority_level || "").toUpperCase();
             console.log("✓ Priority updated:", data.priority_level);
+        } else {
+            console.warn("⚠️ Priority element not found!");
         }
 
         // Display topics
-        const topicsEl = document.querySelector('[data-topics]') || document.getElementById("topics");
-        if (topicsEl && data.topics && data.topics.length > 0) {
-            topicsEl.innerText = data.topics.join(", ");
+        if (elements.topics && data.topics && data.topics.length > 0) {
+            elements.topics.innerText = data.topics.join(", ");
             console.log("✓ Topics updated:", data.topics);
+        } else {
+            console.warn("⚠️ Topics element not found or no topics!");
         }
 
         // Display extracted entities
-        const entityList = document.getElementById("entityList");
-        if (entityList) {
-            entityList.innerHTML = "";
+        if (elements.entityList) {
+            elements.entityList.innerHTML = "";
             // Support both 'entities' and 'entities_detected' field names
             const entityArray = data.entities || data.entities_detected || [];
-            console.log("📊 Displaying", entityArray.length, "entities:", entityArray);
+            console.log("📊 Displaying", entityArray.length, "entities");
             
-            entityArray.forEach(ent => {
+            if (entityArray.length > 0) {
+                entityArray.forEach(ent => {
+                    const li = document.createElement("li");
+                    li.innerText = ent;
+                    elements.entityList.appendChild(li);
+                });
+            } else {
                 const li = document.createElement("li");
-                li.innerText = ent;
-                entityList.appendChild(li);
-            });
+                li.innerText = "No entities detected";
+                li.style.color = "#888";
+                elements.entityList.appendChild(li);
+            }
+        } else {
+            console.warn("⚠️ Entity list element not found!");
         }
 
         // Store draft ID for later use
@@ -434,10 +481,10 @@ async function generatePIL(idx = null, auto = false) {
 
         // Display legal sources with relevance
         if (data.legal_sources_used) {
-            console.log("⚖️ Legal sources:", data.legal_sources_used);
+            console.log("⚖️ Legal sources:", data.legal_sources_used.length || 0);
         }
 
-        setStatus("✅ PIL Generated! Click 'View & Edit PIL' to customize.", "success");
+        setStatus("✅ PIL Generated! Check above for results. Click 'View & Edit PIL' for full document.", "success");
         console.log("🎉 generatePIL completed successfully");
     } catch (err) {
         console.error("❌ generatePIL error:", err);

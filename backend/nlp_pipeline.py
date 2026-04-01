@@ -16,19 +16,23 @@ def get_nlp_model():
             logger.info("Loading spaCy model en_core_web_sm...")
             _nlp_model = spacy.load("en_core_web_sm")
             logger.info("✓ spaCy model loaded successfully")
-        except OSError:
-            logger.warning("⚠️ spaCy model not found, downloading...")
+        except (OSError, ImportError) as e:
+            logger.warning(f"⚠️ spaCy model not found ({e}), attempting download...")
             try:
                 import subprocess
                 import sys
-                subprocess.check_call(
+                # Try to download with explicit timeout
+                subprocess.run(
                     [sys.executable, "-m", "spacy", "download", "en_core_web_sm", "--quiet"],
-                    timeout=120
+                    timeout=300,
+                    check=True,
+                    capture_output=True
                 )
                 _nlp_model = spacy.load("en_core_web_sm")
-                logger.info("✓ spaCy model downloaded and loaded")
-            except Exception as e:
-                logger.error(f"❌ Failed to load spaCy model: {e}")
+                logger.info("✓ spaCy model downloaded and loaded successfully")
+            except Exception as download_error:
+                logger.error(f"❌ Failed to download spaCy model: {download_error}")
+                # Return None - extract_issue will handle gracefully
                 _nlp_model = False
     
     return _nlp_model if _nlp_model is not False else None

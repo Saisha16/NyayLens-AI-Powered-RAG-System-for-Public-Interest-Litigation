@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Frontend Display Test</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        .test-section { border: 1px solid #ccc; padding: 15px; margin: 10px 0; }
+        .success { color: green; }
+        .error { color: red; }
+        pre { background: #f0f0f0; padding: 10px; overflow: auto; }
+    </style>
+</head>
+<body>
+    <h1>Frontend Display Diagnostic Test</h1>
+    
+    <div class="test-section">
+        <h2>1. Test API Connection</h2>
+        <button onclick="testAPI()">Test Generate PIL API</button>
+        <div id="apiResult"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>2. Test DOM Elements</h2>
+        <button onclick="testDOM()">Check HTML Elements</button>
+        <div id="domResult"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>3. Simulated Results Display</h2>
+        <div id="testDisplay">
+            <h3>Test Severity: <span id="testSeverity">—</span></h3>
+            <h3>Test Priority: <span id="testPriority">—</span></h3>
+            <h3>Test Topics: <span id="testTopics">—</span></h3>
+            <h3>Test Entities:</h3>
+            <ul id="testEntityList"></ul>
+        </div>
+    </div>
+    
+    <script>
+    async function testAPI() {
+        const resultDiv = document.getElementById('apiResult');
+        resultDiv.innerHTML = '<p>Testing...</p>';
+        
+        try {
+            const response = await fetch('http://127.0.0.1:8001/generate-pil?idx=0');
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            
+            const data = await response.json();
+            resultDiv.innerHTML = `
+                <p class="success">✓ API Connected</p>
+                <p>Status: 200 OK</p>
+                <p>Data received:</p>
+                <pre>${JSON.stringify(data, null, 2).substring(0, 500)}</pre>
+                <button onclick="displayTestResults()">Display Results Now</button>
+            `;
+            
+            // Store for later use
+            window.testData = data;
+        } catch(err) {
+            resultDiv.innerHTML = `<p class="error">✗ API Error: ${err.message}</p>`;
+        }
+    }
+    
+    function testDOM() {
+        const resultDiv = document.getElementById('domResult');
+        const elements = [
+            'newsTitle', 'severityScore', 'priorityLevel', 'topics', 'entityList'
+        ];
+        
+        let html = '<p>Checking for elements:</p><ul>';
+        elements.forEach(id => {
+            const el = document.getElementById(id);
+            const status = el ? '✓' : '✗';
+            const className = el ? 'success' : 'error';
+            html += `<li><span class="${className}">${status}</span> #${id} - ${el ? 'FOUND' : 'NOT FOUND'}</li>`;
+        });
+        html += '</ul>';
+        
+        resultDiv.innerHTML = html;
+    }
+    
+    function displayTestResults() {
+        if (!window.testData) {
+            alert('Run test API first');
+            return;
+        }
+        
+        const data = window.testData;
+        document.getElementById('testSeverity').innerText = data.severity_score ? (data.severity_score * 10).toFixed(1) + ' / 10' : '—';
+        document.getElementById('testPriority').innerText = data.priority_level || '—';
+        document.getElementById('testTopics').innerText = (data.topics || []).join(', ');
+        
+        const ul = document.getElementById('testEntityList');
+        ul.innerHTML = '';
+        (data.entities || []).forEach(ent => {
+            const li = document.createElement('li');
+            li.innerText = ent;
+            ul.appendChild(li);
+        });
+        
+        alert('Results displayed! Check "3. Simulated Results Display" section');
+    }
+    </script>
+</body>
+</html>
