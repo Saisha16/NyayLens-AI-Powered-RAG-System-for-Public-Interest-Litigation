@@ -1,5 +1,13 @@
 // Resolve API base once so we can override without editing code
-const DEFAULT_API_URL = "http://localhost:8001";
+// Auto-detect: use same hostname for production, localhost:8001 for local dev
+const DEFAULT_API_URL = (() => {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') {
+        return 'http://localhost:8001'; // Local development
+    }
+    // Production: use https with current hostname (e.g., nyaylens-backend.onrender.com)
+    return 'https://' + host;
+})();
 function resolveApiBase() {
     const fromStorage = localStorage.getItem("api_base_url");
     const fromGlobal = typeof window !== "undefined" && window.API_URL ? window.API_URL : null;
