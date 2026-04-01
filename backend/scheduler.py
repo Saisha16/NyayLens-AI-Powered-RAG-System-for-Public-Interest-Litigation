@@ -1,7 +1,6 @@
 import schedule
 import time
 import logging
-from backend.ingest_news_enhanced import fetch_news
 
 logger = logging.getLogger(__name__)
 
@@ -9,6 +8,9 @@ def scheduled_fetch():
     """Fetch news daily and append to existing articles."""
     logger.info("Starting scheduled news fetch...")
     try:
+        # Lazy import keeps API startup resilient on hosts where optional
+        # ingestion dependencies are temporarily unavailable.
+        from backend.ingest_news_enhanced import fetch_news
         articles = fetch_news(days_back=1, max_per_feed=5)
         logger.info(f"Fetched {len(articles)} new articles")
     except Exception as e:
