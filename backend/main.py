@@ -112,17 +112,40 @@ async def startup_events():
     """Initialize required files and background tasks on app startup."""
     ensure_news_file_exists()
     
-    # Ensure spaCy model is available before serving requests
-    logger.info("🔍 Checking spaCy model availability on startup...")
+    # CRITICAL: Download spaCy model BEFORE serving requests
+    # This prevents timeout errors when first request tries to download
+    logger.info("🔍 Preparing spaCy model on startup (this may take 3-5 minutes)...")
     try:
+        import subprocess
+        import sys
+        
+        # Force download with explicit parameters
+        logger.info("📥 Downloading spaCy model en_core_web_sm...")
+        result = subprocess.run(
+            [sys.executable, "-m", "spacy", "download", "en_core_web_sm"],
+            timeout=600,
+            check=False,
+            capture_output=True,
+            text=True
+        )
+        
+        if result.returncode == 0:
+            logger.info(f"✅ spaCy download successful")
+        else:
+            logger.warning(f"⚠️ spaCy download returned code {result.returncode}")
+            if result.stderr:
+                logger.warning(f"   stderr: {result.stderr[:300]}")
+        
+        # Now try to load
         from backend.nlp_pipeline import get_nlp_model
         nlp = get_nlp_model()
         if nlp:
-            logger.info("✅ spaCy model ready for serving requests")
+            logger.info("✅ spaCy model loaded and ready for requests")
         else:
-            logger.warning("⚠️ spaCy model failed to load - requests may fail gracefully")
+            logger.warning("⚠️ spaCy model unavailable - will use fallback mode")
+            
     except Exception as e:
-        logger.warning(f"⚠️ spaCy model check failed: {e}")
+        logger.error(f"❌ spaCy setup failed: {e}", exc_info=True)
     
     logger.info("Startup events completed")
 
