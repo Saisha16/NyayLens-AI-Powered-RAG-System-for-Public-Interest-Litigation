@@ -1,10 +1,5 @@
 import logging
 from fastapi import FastAPI, Query, Body, HTTPException
-import signal
-from contextlib import contextmanager
-from threading import Thread
-from backend.scheduler import start_scheduler
-
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -15,8 +10,8 @@ import os
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
-import signal
 import threading
+from threading import Thread
 
 # Optional rate limiting; start without if unavailable
 try:
@@ -34,7 +29,6 @@ from backend.latex_pdf_generator import LatexPDFGenerator
 from backend.severity_scoring import calculate_severity
 from backend.ingest_news_enhanced import add_custom_news
 from backend.config import config
-from threading import Thread
 from backend.scheduler import start_scheduler
 # Ensure logs directory exists before logger setup
 os.makedirs("logs", exist_ok=True)
@@ -356,34 +350,8 @@ def list_topics():
     return {"topics": sorted(topics)}
 
 
-class TimeoutError(Exception):
-    """Custom timeout exception"""
-    pass
-
-
-def run_with_timeout(func, timeout_seconds, *args, **kwargs):
-    """Run function with timeout (works on Unix/Linux, not Windows)"""
-    try:
-        if hasattr(signal, 'alarm'):
-            # Unix/Linux: use signal
-            def timeout_handler(signum, frame):
-                raise TimeoutError(f"Operation timed out after {timeout_seconds}s")
-            
-            old_handler = signal.signal(signal.SIGALRM, timeout_handler)
-            signal.alarm(timeout_seconds)
-            try:
-                result = func(*args, **kwargs)
-            finally:
-                signal.alarm(0)
-                signal.signal(signal.SIGALRM, old_handler)
-            return result
-        else:
-            # Windows or no signal support: just run normally
-            logger.warning("Timeout not supported on this platform, running without timeout")
-            return func(*args, **kwargs)
-    except TimeoutError as e:
-        logger.error(f"Timeout: {str(e)}")
-        raise
+# Signal-based timeouts don't work on Render's threaded environment
+# Just run functions directly; HTTP layer provides fallback timeout (~30s)
 
 
 @app.get("/generate-pil")
@@ -430,105 +398,57 @@ def generate_pil_from_news(idx: int = Query(0, ge=0), topic: str | None = Query(
 
         try:
             if full_rag:
-                # FULL RAG MODE: Complete NLP processing with timeout protection
-                logger.info("Using FULL RAG mode - running complete NLP pipeline with 25s timeout (may timeout on free tier)")
+                # FULL RAG MODE: Complete NLP processing (may timeout on free tier)
+                logger.info("Using FULL RAG mode - running complete NLP pipeline (may timeout/require paid tier)")
                 
-                def run_nlp():
-                    nonlocal issue, severity, legal_sections, pil_draft_text
-                    
-                    issue = extract_issue(article["text"])
-                    logger.info(f"✓ Issue extracted: {issue['issue_summary'][:80]}")
-                    
-                    severity = calculate_severity(article["text"], all_texts)
-                    logger.info(f"✓ Severity calculated: {severity}")
-                    
-                    legal_sections = retrieve_legal_sections(
-                        issue["issue_summary"], 
-                        topics=article_topics,
-                        entities=issue["entities"]
-                    )
-                    logger.info(f"✓ Retrieved {len(legal_sections)} legal sections")
-                    
-                    pil_draft_text = generate_pil(
-                        issue, 
-                        legal_sections,
-                        topics=article_topics,
-                        news_title=article["title"],
-                        severity_score=severity
-                    )
-                    logger.info(f"✓ PIL generated successfully")
+                issue = extract_issue(article["text"])
+                logger.info(f"✓ Issue extracted")
                 
-                try:
-                    run_with_timeout(run_nlp, timeout_seconds=25)
-                    lite = False
-                except TimeoutError as te:
-                    logger.error(f"NLP pipeline timeout after 25s: {str(te)}")
-                    logger.info("Timeout on free tier - falling back to LITE mode (template-based)")
-                    lite = True
-                    # Re-run lite mode logic
-                    try:
-                        severity = calculate_severity(article["text"], all_texts)
-                    except Exception as e:
-                        logger.warning(f"Severity calculation skipped: {e}")
-                        severity = 0.5
-                    
-                    legal_sections = [
-                        {"category": "Fundamental Right", "source": "Article 21 - Right to Life", "detail": "Protection of life and personal liberty"},
-                        {"category": "Fundamental Right", "source": "Article 14 - Equality", "detail": "Equality before law"},
-                    ]
-                    
-                    issue = {
-                        "issue_summary": article.get("summary", article["text"][:200]),
-                        "entities": article_topics
-                    }
-                    
-                    pil_draft_text = f"""
-## {article.get('title', 'Public Interest Matter')}
-
-**Nature of Issue:** {', '.join(article_topics)}
-
-### Facts of the Case
-{article.get('summary', article['text'][:500])}
-
-### Grounds for PIL
-- Violation of fundamental rights as guaranteed by the Constitution
-- Matter of public interest requiring judicial intervention
-
-### Relief Sought
-1. Appropriate action by the concerned authorities
-2. Compensation to affected parties where applicable
-3. Implementation of preventive measures
-
-### Case Precedents
-- S.P. Gupta v. Union of India – Expanded locus standi in PIL
-- Bandhua Mukti Morcha v. Union of India – Epistolary jurisdiction
-"""
+                severity = calculate_severity(article["text"], all_texts)
+                logger.info(f"✓ Severity calculated: {severity}")
                 
+                legal_sections = retrieve_legal_sections(
+                    issue["issue_summary"], 
+                    topics=article_topics,
+                    entities=issue["entities"]
+                )
+                logger.info(f"✓ Retrieved {len(legal_sections)} legal sections")
+                
+                pil_draft_text = generate_pil(
+                    issue, 
+                    legal_sections,
+                    topics=article_topics,
+                    news_title=article["title"],
+                    severity_score=severity
+                )
+                logger.info(f"✓ PIL generated successfully")
+                lite = False
+                    
             else:
-                # LITE MODE: Template-based PIL (default for free tier stability)
+                # LITE MODE: Template-based PIL (default, fast, always works on free tier)
                 logger.info("Using LITE mode - template-based PIL generation (fast, stable on free tier)")
                 lite = True
                 
-                # Just extract severity without full NLP
+                # Simple severity from keywords (no model loading)
                 try:
                     severity = calculate_severity(article["text"], all_texts)
                 except Exception as e:
                     logger.warning(f"Severity calculation skipped: {e}")
                     severity = 0.5  # Default medium severity
                 
-                # Use mock legal sections to avoid RAG overhead
+                # Mock legal sections (no RAG overhead)
                 legal_sections = [
                     {"category": "Fundamental Right", "source": "Article 21 - Right to Life", "detail": "Protection of life and personal liberty"},
                     {"category": "Fundamental Right", "source": "Article 14 - Equality", "detail": "Equality before law"},
                 ]
                 
-                # Simple issue extraction without NLP
+                # Simple issue from text (no NLP)
                 issue = {
                     "issue_summary": article.get("summary", article["text"][:200]),
                     "entities": article_topics
                 }
                 
-                # Generate lightweight PIL
+                # Generate template-based PIL
                 pil_draft_text = f"""
 ## {article.get('title', 'Public Interest Matter')}
 
