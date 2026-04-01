@@ -25,24 +25,3 @@ services:
     healthCheckPath: /health
     autoDeploy: true
 
-  # Static Frontend Service
-  - type: static_site
-    name: nyaylens-frontend
-    buildCommand: echo "No build needed"
-    staticPublishPath: ./frontend
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
-    headers:
-      - path: /*
-        name: Cache-Control
-        value: public, max-age=0, must-revalidate
-
-databases:
-  # PostgreSQL Database (optional - currently using JSON)
-  - name: nyaylens-db
-    plan: free
-    region: oregon
-    databaseName: nyaylens
-    user: nyaylens_user
