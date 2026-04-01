@@ -399,7 +399,7 @@ def generate_pil_from_news(idx: int = Query(0, ge=0), topic: str | None = Query(
         try:
             if full_rag:
                 # FULL RAG MODE: Complete NLP processing (may timeout on free tier)
-                logger.info("Using FULL RAG mode - running complete NLP pipeline (may timeout/require paid tier)")
+                logger.info("🔬 [FULL_RAG] Running complete NLP pipeline (may timeout/require paid tier)")
                 
                 issue = extract_issue(article["text"])
                 logger.info(f"✓ Issue extracted")
