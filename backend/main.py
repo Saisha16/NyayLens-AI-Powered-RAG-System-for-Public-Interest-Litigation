@@ -110,44 +110,28 @@ app = FastAPI(
 @app.on_event("startup")
 async def startup_events():
     """Initialize required files and background tasks on app startup."""
-    ensure_news_file_exists()
+    try:
+        ensure_news_file_exists()
+        logger.info("✅ News file initialized")
+    except Exception as e:
+        logger.error(f"❌ Failed to initialize news file: {e}")
     
     # CRITICAL: Download spaCy model BEFORE serving requests
-    # This prevents timeout errors when first request tries to download
-    logger.info("🔍 Preparing spaCy model on startup (this may take 3-5 minutes)...")
+    logger.info("🔍 Checking spaCy model on startup...")
     try:
-        import subprocess
-        import sys
-        
-        # Force download with explicit parameters
-        logger.info("📥 Downloading spaCy model en_core_web_sm...")
-        result = subprocess.run(
-            [sys.executable, "-m", "spacy", "download", "en_core_web_sm"],
-            timeout=600,
-            check=False,
-            capture_output=True,
-            text=True
-        )
-        
-        if result.returncode == 0:
-            logger.info(f"✅ spaCy download successful")
-        else:
-            logger.warning(f"⚠️ spaCy download returned code {result.returncode}")
-            if result.stderr:
-                logger.warning(f"   stderr: {result.stderr[:300]}")
-        
-        # Now try to load
         from backend.nlp_pipeline import get_nlp_model
+        
         nlp = get_nlp_model()
+        
         if nlp:
-            logger.info("✅ spaCy model loaded and ready for requests")
+            logger.info("✅ spaCy model ready for requests")
         else:
             logger.warning("⚠️ spaCy model unavailable - will use fallback mode")
             
     except Exception as e:
-        logger.error(f"❌ spaCy setup failed: {e}", exc_info=True)
+        logger.error(f"❌ Error loading spaCy: {e}", exc_info=True)
     
-    logger.info("Startup events completed")
+    logger.info("✅ Startup events completed - App is ready!")
 
 # Start scheduler in background thread
 scheduler_thread = Thread(target=start_scheduler, daemon=True)
