@@ -1141,6 +1141,70 @@ function initialize() {
             }
         });
     });
+    
+    // Setup main action button listeners
+    const btnGeneratePIL = document.getElementById('btnGeneratePIL');
+    const btnViewPIL = document.getElementById('btnViewPIL');
+    const btnExplainability = document.getElementById('btnExplainability');
+    const btnDownloadPDF = document.getElementById('btnDownloadPDF');
+    const btnRefreshNews = document.getElementById('btnRefreshNews');
+    const btnAddCustomArticle = document.getElementById('btnAddCustomArticle');
+    const btnSubmitCustomArticle = document.getElementById('btnSubmitCustomArticle');
+    
+    if (btnGeneratePIL) {
+        btnGeneratePIL.addEventListener('click', () => {
+            console.log("🔘 Generate PIL button clicked");
+            generatePIL();
+        });
+    }
+    
+    if (btnViewPIL) {
+        btnViewPIL.addEventListener('click', () => {
+            console.log("🔘 View PIL button clicked");
+            viewPil();
+        });
+    }
+    
+    if (btnExplainability) {
+        btnExplainability.addEventListener('click', () => {
+            console.log("🔘 Explainability button clicked");
+            showExplainability();
+        });
+    }
+    
+    if (btnDownloadPDF) {
+        btnDownloadPDF.addEventListener('click', () => {
+            console.log("🔘 Download PDF button clicked");
+            downloadPDF();
+        });
+    }
+    
+    if (btnRefreshNews) {
+        btnRefreshNews.addEventListener('click', () => {
+            console.log("🔘 Refresh News button clicked");
+            loadNews();
+        });
+    }
+    
+    if (btnAddCustomArticle) {
+        btnAddCustomArticle.addEventListener('click', () => {
+            console.log("🔘 Add Custom Article button clicked");
+            if (typeof addCustomNews === 'function') {
+                addCustomNews();
+            } else {
+                console.warn("⚠️ addCustomNews function not defined yet");
+            }
+        });
+    }
+    
+    if (btnSubmitCustomArticle) {
+        btnSubmitCustomArticle.addEventListener('click', () => {
+            console.log("🔘 Submit Custom Article button clicked");
+            submitCustomArticle();
+        });
+    }
+    
+    console.log("✅ All button listeners attached");
 }
 
 // Robust bootstrap: run immediately if DOM already ready, else wait
