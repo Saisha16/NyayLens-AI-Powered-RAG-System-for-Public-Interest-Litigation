@@ -189,8 +189,14 @@ def semantic_search(query: str, top_k: int = 10, min_score: float = RELEVANCE_TH
     Returns:
         List of relevant legal references with source, title, excerpt, category, similarity, and reason.
     """
+    import os
+    
     if not query or len(query.strip()) == 0:
         return []
+
+    # Skip semantic search on Render free tier to avoid timeout (30s limit)
+    if os.environ.get('RENDER') or os.environ.get('RENDER_USE_PAGER'):
+        return []  # Return empty to skip expensive semantic search
 
     _init_index()
     model = _get_model()
