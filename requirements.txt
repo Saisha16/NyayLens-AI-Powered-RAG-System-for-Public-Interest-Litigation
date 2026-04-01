@@ -23,6 +23,7 @@ psycopg2-binary
 redis
 python-json-logger
 slowapi
+schedule
 sentry-sdk
 pytest
 pytest-cov
