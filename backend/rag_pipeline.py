@@ -12,6 +12,32 @@ from backend.constitutional_db import (
     ADDITIONAL_PROVISIONS
 )
 
+# Module-level cache to avoid reloading legal_chunks.json on every request
+_legal_chunks_cache = None
+_bns_chunks_cache = None
+
+def _get_cached_legal_chunks():
+    """Load legal_chunks.json once and cache it."""
+    global _legal_chunks_cache
+    if _legal_chunks_cache is not None:
+        return _legal_chunks_cache
+    
+    import json
+    from pathlib import Path
+    
+    chunks_path = Path("data/legal_chunks.json")
+    if not chunks_path.exists():
+        _legal_chunks_cache = []
+        return []
+    
+    try:
+        with open(chunks_path, "r", encoding="utf-8") as f:
+            _legal_chunks_cache = json.load(f)
+        return _legal_chunks_cache
+    except Exception:
+        _legal_chunks_cache = []
+        return []
+
 
 def retrieve_legal_sections(issue_summary: str, topics: list = None, entities: list = None):
     """
@@ -183,12 +209,10 @@ def _get_bns_sections(issue_summary: str = "") -> list:
         from pathlib import Path
         import re
         
-        chunks_path = Path("data/legal_chunks.json")
-        if not chunks_path.exists():
+        # Use cached legal chunks instead of reloading file
+        chunks = _get_cached_legal_chunks()
+        if not chunks:
             return []
-        
-        with open(chunks_path, "r", encoding="utf-8") as f:
-            chunks = json.load(f)
         
         # Filter for BNS chunks
         bns_chunks = [c for c in chunks if "Bhartiya_Nyaya" in c.get("file", "") or "Bhartiya Nyaya Sanhita" in c.get("source", "")]
