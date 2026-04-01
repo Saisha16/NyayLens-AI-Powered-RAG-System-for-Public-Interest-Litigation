@@ -364,17 +364,33 @@ async function generatePIL(idx = null, auto = false) {
         const data = await response.json();
 
         document.getElementById("newsTitle").innerText = data.news_title || "No title";
-        document.getElementById("severityScore").innerText = data.severity_score ?? "—";
+        
+        // Display severity score - show as score/10 format
+        const severityEl = document.getElementById("severityScore");
+        if (severityEl) {
+            severityEl.innerText = typeof data.severity_score === 'number' 
+                ? (data.severity_score * 10).toFixed(1) + " / 10" 
+                : "—";
+        }
 
+        // Display summary/excerpt
         excerptEl.textContent = data.summary || data.excerpt || "—";
         if (data.news_index !== undefined) {
             newsSelect.value = data.news_index;
         }
 
+        // Display priority level with color coding
         const priority = document.getElementById("priorityLevel");
         priority.innerText = data.priority_level || "—";
-        priority.className = data.priority_level || "";
+        priority.className = (data.priority_level || "").toUpperCase();
 
+        // Display topics
+        const topicsEl = document.querySelector('[data-topics]') || document.getElementById("topics");
+        if (topicsEl && data.topics && data.topics.length > 0) {
+            topicsEl.innerText = data.topics.join(", ");
+        }
+
+        // Display extracted entities
         const entityList = document.getElementById("entityList");
         entityList.innerHTML = "";
         // Support both 'entities' and 'entities_detected' field names
