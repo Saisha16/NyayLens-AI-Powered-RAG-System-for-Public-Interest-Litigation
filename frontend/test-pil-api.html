@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>NyayLens - API Test Console</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #0f0f0f;
+            color: #e0e0e0;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #444;
+            border-radius: 5px;
+        }
+        .success { color: #4ade80; }
+        .error { color: #f87171; }
+        .info { color: #60a5fa; }
+        .warning { color: #fbbf24; }
+        button {
+            background: #7c3aed;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px 5px 5px 0;
+        }
+        button:hover { background: #6d28d9; }
+        .output {
+            background: #1a1a1a;
+            padding: 10px;
+            margin-top: 10px;
+            border-left: 3px solid #7c3aed;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        pre { margin: 0; white-space: pre-wrap; word-wrap: break-word; }
+    </style>
+</head>
+<body>
+    <h1>🔧 NyayLens API Test Console</h1>
+    <p>Use this page to diagnose frontend vs backend issues</p>
+
+    <div class="test-section">
+        <h2>1. Backend Health Check</h2>
+        <button onclick="testHealth()">Test Backend Health</button>
+        <div id="healthOutput" class="output"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>2. API Configuration</h2>
+        <button onclick="testConfig()">Check API Configuration</button>
+        <div id="configOutput" class="output"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>3. Generate PIL</h2>
+        <button onclick="testGeneratePil()">Generate PIL (idx=0)</button>
+        <div id="pilOutput" class="output"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>4. View Full PIL Document</h2>
+        <button onclick="testViewPil()">View Generated PIL</button>
+        <div id="viewOutput" class="output"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>5. DOM Element Check</h2>
+        <button onclick="testDOM()">Check Frontend DOM Elements</button>
+        <div id="domOutput" class="output"></div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8001';
+        let generatedDraftId = null;
+
+        function log(message, type = 'info') {
+            const styles = {
+                success: '✅',
+                error: '❌',
+                warning: '⚠️',
+                info: 'ℹ️'
+            };
+            return `<span class="${type}">${styles[type]} ${message}</span>`;
+        }
+
+        async function testHealth() {
+            const output = document.getElementById('healthOutput');
+            output.innerHTML = '<pre>Testing...</pre>';
+            try {
+                const res = await fetch(`${API_URL}/health`);
+                const data = await res.json();
+                output.innerHTML = `<pre>${log('Backend is running!', 'success')}
+${log(`Status: ${res.status}`, 'success')}
+${log(`Response: ${JSON.stringify(data, null, 2)}`, 'info')}</pre>`;
+            } catch (err) {
+                output.innerHTML = `<pre>${log(`Failed to connect to backend at ${API_URL}`, 'error')}
+Error: ${err.message}</pre>`;
+            }
+        }
+
+        function testConfig() {
+            const output = document.getElementById('configOutput');
+            output.innerHTML = `<pre>${log(`API URL: ${API_URL}`, 'info')}
+${log(`Hostname: ${window.location.hostname}`, 'info')}
+${log(`Protocol: ${window.location.protocol}`, 'info')}
+${log(`Port: ${window.location.port || 'default'}`, 'info')}
+${log('This is a standalone test - not using main app', 'warning')}</pre>`;
+        }
+
+        async function testGeneratePil() {
+            const output = document.getElementById('pilOutput');
+            output.innerHTML = '<pre>Generating PIL...</pre>';
+            try {
+                console.log('Fetching:', `${API_URL}/generate-pil?idx=0`);
+                const res = await fetch(`${API_URL}/generate-pil?idx=0`);
+                const data = await res.json();
+                generatedDraftId = data.draft_id;
+                
+                output.innerHTML = `<pre>${log('PIL generated successfully!', 'success')}
+${log(`Title: ${data.news_title}`, 'info')}
+${log(`Severity: ${data.severity_score} (${data.severity_score * 10} / 10)`, 'info')}
+${log(`Priority: ${data.priority_level}`, 'info')}
+${log(`Topics: ${data.topics.join(', ')}`, 'info')}
+${log(`Entities: ${data.entities.length} found`, 'info')}
+${log(`Draft ID: ${data.draft_id} (saved for next test)`, 'success')}
+${log(`Full Response:`, 'warning')}
+${JSON.stringify(data, null, 2)}</pre>`;
+            } catch (err) {
+                output.innerHTML = `<pre>${log('Failed to generate PIL', 'error')}
+Error: ${err.message}</pre>`;
+            }
+        }
+
+        async function testViewPil() {
+            const output = document.getElementById('viewOutput');
+            if (!generatedDraftId) {
+                output.innerHTML = `<pre>${log('No draft ID available. Run "Generate PIL" first.', 'warning')}</pre>`;
+                return;
+            }
+            
+            output.innerHTML = '<pre>Fetching PIL document...</pre>';
+            try {
+                const res = await fetch(`${API_URL}/view-pil?draft_id=${generatedDraftId}`);
+                const data = await res.json();
+                
+                output.innerHTML = `<pre>${log('PIL document retrieved!', 'success')}
+${log(`Facts: ${data.facts_of_case.length} chars`, 'info')}
+${log(`Rights: ${data.fundamental_rights.length} items`, 'info')}
+${log(`Principles: ${data.directive_principles.length} items`, 'info')}
+${log(`Precedents: ${data.case_precedents.length} items`, 'info')}
+${log(`Prayer: ${data.prayer_relief.length} chars`, 'info')}
+
+${log('First 3 Case Precedents:', 'warning')}
+${data.case_precedents.slice(0, 3).map(c => `  - ${c}`).join('\n')}
+
+${log('Full Response:', 'warning')}
+${JSON.stringify(data, null, 2).substring(0, 1500)}...</pre>`;
+            } catch (err) {
+                output.innerHTML = `<pre>${log('Failed to view PIL', 'error')}
+Error: ${err.message}</pre>`;
+            }
+        }
+
+        function testDOM() {
+            const output = document.getElementById('domOutput');
+            const checks = [
+                { name: 'newsTitle', id: 'newsTitle' },
+                { name: 'severityScore', id: 'severityScore' },
+                { name: 'priorityLevel', id: 'priorityLevel' },
+                { name: 'topics', id: 'topics' },
+                { name: 'entityList', id: 'entityList' },
+                { name: 'excerpt', id: 'excerpt' },
+                { name: 'status', id: 'status' }
+            ];
+
+            let html = `${log('Frontend DOM Element Check', 'info')}\n\n`;
+            checks.forEach(check => {
+                const elm = document.getElementById(check.id);
+                if (elm) {
+                    html += `${log(`✓ Found: ${check.name} (#${check.id})`, 'success')}\n`;
+                } else {
+                    html += `${log(`✗ Missing: ${check.name} (#${check.id})`, 'error')}\n`;
+                }
+            });
+
+            html += `\n${log('Note: This is a standalone test page - main app elements may differ', 'warning')}`;
+            output.innerHTML = `<pre>${html}</pre>`;
+        }
+
+        // Auto-run health check on load
+        window.addEventListener('load', testHealth);
+    </script>
+</body>
+</html>
