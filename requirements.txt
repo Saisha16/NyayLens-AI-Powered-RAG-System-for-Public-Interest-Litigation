@@ -4,7 +4,6 @@ feedparser
 newspaper3k
 lxml_html_clean
 numpy<2
-spacy
 sentence-transformers
 faiss-cpu
 chromadb
