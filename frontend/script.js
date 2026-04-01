@@ -458,42 +458,85 @@ async function viewPil() {
 }
 
 function displayPilPreview(draft) {
+    // Verify we have data
+    console.log("📊 displayPilPreview DEBUG:", {
+        facts_len: draft.facts_of_case ? draft.facts_of_case.length : 0,
+        rights_count: draft.fundamental_rights ? draft.fundamental_rights.length : 0,
+        principles_count: draft.directive_principles ? draft.directive_principles.length : 0,
+        cases_count: draft.case_precedents ? draft.case_precedents.length : 0,
+        prayer_len: draft.prayer_relief ? draft.prayer_relief.length : 0,
+        full_draft: draft  // Log entire draft for debugging
+    });
+    
+    // Helper to escape HTML
+    const escapeHTML = (text) => {
+        if (!text) return "";
+        return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    };
+    
+    // Build facts section
+    const factsHTML = escapeHTML(draft.facts_of_case || "");
+    
+    // Build rights section with proper handling
+    const rightsArray = Array.isArray(draft.fundamental_rights) ? draft.fundamental_rights : [];
+    const rightsHTML = rightsArray
+        .filter(r => r && String(r).trim())
+        .map(r => `<li>${escapeHTML(r)}</li>`)
+        .join('');
+    
+    // Build principles section
+    const principlesArray = Array.isArray(draft.directive_principles) ? draft.directive_principles : [];
+    const principlesHTML = principlesArray
+        .filter(p => p && String(p).trim())
+        .map(p => `<li>${escapeHTML(p)}</li>`)
+        .join('');
+    
+    // Build case precedents section
+    const casesArray = Array.isArray(draft.case_precedents) ? draft.case_precedents : [];
+    const casesHTML = casesArray
+        .filter(c => c && String(c).trim())
+        .map(c => `<li>${escapeHTML(c)}</li>`)
+        .join('');
+    
+    // Build prayer section
+    const prayerHTML = escapeHTML(draft.prayer_relief || "");
+    
     const preview = `
 <div class="pil-header">
-    <h3>${draft.news_title}</h3>
+    <h3>${escapeHTML(draft.news_title || "")}</h3>
     <p><strong>Severity:</strong> ${draft.priority_level} (${draft.severity_score})</p>
     <p><strong>Last Updated:</strong> ${new Date(draft.updated_at).toLocaleString()}</p>
 </div>
 
 <div class="pil-section">
     <h4>Facts of the Case</h4>
-    <p>${draft.facts_of_case}</p>
+    <p>${factsHTML}</p>
 </div>
 
 <div class="pil-section">
     <h4>Fundamental Rights Violated</h4>
     <ul>
-        ${draft.fundamental_rights.map(r => `<li>${r}</li>`).join('')}
+        ${rightsHTML || '<li style="color: #888;">No data</li>'}
     </ul>
 </div>
 
 <div class="pil-section">
-    <h4>Directive Principles</h4>
+    <h4>Directive Principles of State Policy</h4>
     <ul>
-        ${draft.directive_principles.map(p => `<li>${p}</li>`).join('')}
+        ${principlesHTML || '<li style="color: #888;">No data</li>'}
     </ul>
 </div>
 
 <div class="pil-section">
-    <h4>Case Precedents</h4>
+    <h4>Relevant Case Precedents (${casesArray.length} items)</h4>
     <ul>
-        ${draft.case_precedents.map(c => `<li>${c}</li>`).join('')}
+        ${casesHTML || '<li style="color: #888;">No data</li>'}
     </ul>
 </div>
 
 <div class="pil-section">
     <h4>Prayer for Relief</h4>
-    <p>${draft.prayer_relief}</p>
+    <p>${prayerHTML}</p>
 </div>
 
 <div class="pil-footer">
@@ -501,7 +544,13 @@ function displayPilPreview(draft) {
 </div>
     `;
     
-    document.getElementById("pilPreview").innerHTML = preview;
+    const previewDiv = document.getElementById("pilPreview");
+    if (previewDiv) {
+        previewDiv.innerHTML = preview;
+        console.log("✅ PIL preview rendered to DOM with", casesArray.length, "case precedents");
+    } else {
+        console.error("❌ pilPreview div not found!");
+    }
 }
 
 function switchTab(tabName, evt) {

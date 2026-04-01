@@ -557,17 +557,6 @@ def view_pil_draft(draft_id: str = Query(None)):
 
     # Ensure normalized and persisted (pull case precedents out of directives if embedded)
     PILManager.save_draft(draft)
-
-    # Guarantee case precedents are present (fallback defaults if still empty)
-    if not draft.case_precedents:
-        draft.case_precedents = [
-            "S.P. Gupta v. Union of India – Expanded locus standi in PIL",
-            "Bandhua Mukti Morcha v. Union of India – Epistolary jurisdiction and access to justice",
-            "People's Union for Democratic Rights v. Union of India – PIL for enforcement of fundamental rights",
-            "D.K. Basu v. State of West Bengal – Custodial violence guidelines",
-            "Nilabati Behera v. State of Orissa – Compensation for custodial death"
-        ]
-        PILManager.save_draft(draft)
     
     return draft.to_dict()
 
