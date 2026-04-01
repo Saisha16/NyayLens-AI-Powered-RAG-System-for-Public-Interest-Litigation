@@ -376,6 +376,9 @@ def generate_pil_from_news(idx: int = Query(0, ge=0), topic: str | None = Query(
         news_file = get_news_file_path()
         with open(news_file, "r", encoding="utf-8") as f:
             news = json.load(f)
+        
+        t1 = time.time()
+        logger.info(f"⏱️ Load news file: {(t1-start_time)*1000:.0f}ms")
 
         if topic:
             news = [n for n in news if topic.lower() in [t.lower() for t in n.get("topics", [])]]
@@ -388,10 +391,14 @@ def generate_pil_from_news(idx: int = Query(0, ge=0), topic: str | None = Query(
         # ✅ REAL NLP: Extract issue entities and summary
         logger.info("🔍 Extracting issue entities with spaCy...")
         issue = extract_issue(article_text)
+        t2 = time.time()
+        logger.info(f"⏱️ Extract issue: {(t2-t1)*1000:.0f}ms")
         
         # ✅ REAL NLP: Calculate real severity score
         logger.info("📊 Calculating severity score...")
         severity_score = calculate_severity(article.get('summary', ''))
+        t3 = time.time()
+        logger.info(f"⏱️ Calculate severity: {(t3-t2)*1000:.0f}ms")
         priority_level = "HIGH" if severity_score > 0.7 else "MEDIUM" if severity_score > 0.4 else "LOW"
         
         # ✅ REAL RAG: Retrieve legal sections for this specific issue
@@ -401,6 +408,8 @@ def generate_pil_from_news(idx: int = Query(0, ge=0), topic: str | None = Query(
             topics=topics,
             entities=issue.get('entities', [])
         )
+        t4 = time.time()
+        logger.info(f"⏱️ Retrieve legal sections: {(t4-t3)*1000:.0f}ms ({len(legal_sections)} sections)")
         
         # ✅ REAL GENERATION: Generate PIL with actual legal references
         logger.info("📝 Generating PIL with legal precedents...")
@@ -411,6 +420,8 @@ def generate_pil_from_news(idx: int = Query(0, ge=0), topic: str | None = Query(
             news_title=article['title'],
             severity_score=severity_score
         )
+        t5 = time.time()
+        logger.info(f"⏱️ Generate PIL: {(t5-t4)*1000:.0f}ms")
         
         # Create draft with real results
         draft = PILManager.create_draft(pil_text, idx, {
@@ -420,6 +431,8 @@ def generate_pil_from_news(idx: int = Query(0, ge=0), topic: str | None = Query(
             "entities": issue.get('entities', []),
             "lite_mode": False
         })
+        t6 = time.time()
+        logger.info(f"⏱️ Create draft: {(t6-t5)*1000:.0f}ms")
 
         logger.info(f"✅ PIL generated in {round(time.time() - start_time, 2)}s - Severity: {severity_score:.2f}")
         

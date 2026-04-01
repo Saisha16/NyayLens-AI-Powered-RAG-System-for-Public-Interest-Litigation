@@ -126,7 +126,13 @@ def _build_corpus() -> List[Dict]:
 
 def _init_index():
     """Initialize corpus and FAISS index once (with caching)."""
+    import os
     global _index, _corpus, _embeddings
+    
+    # Skip index build on Render free tier to prevent timeout
+    if os.environ.get('RENDER') or os.environ.get('RENDER_USE_PAGER'):
+        return
+    
     if _index is not None:
         return
 
