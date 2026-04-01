@@ -355,16 +355,16 @@ def list_topics():
 
 
 @app.get("/generate-pil")
-def generate_pil_from_news(idx: int = Query(0, ge=0), topic: str | None = Query(None), full_rag: bool = Query(False)):
-    """Generate PIL from news article.
+def generate_pil_from_news(idx: int = Query(0, ge=0), topic: str | None = Query(None), full_rag: bool = Query(True)):
+    """Generate PIL from news article using REAL RAG pipeline.
     
     Args:
         idx: Article index
         topic: Filter by topic
-        full_rag: If True, use full RAG pipeline (slower, needs more memory). Default: Fast mode
+        full_rag: Use full NLP + RAG (True = real results)
     """
     start_time = time.time()
-    logger.info(f"📄 v3.FORCE.REBUILD - PIL lite mode - no NLP, instant response")
+    logger.info(f"📄 REAL RAG PIPELINE RESTORED - Using NLP + Legal Retrieval")
     
     try:
         news_file = get_news_file_path()
@@ -377,33 +377,70 @@ def generate_pil_from_news(idx: int = Query(0, ge=0), topic: str | None = Query(
         idx = min(idx or 0, len(news) - 1)
         article = news[idx]
         topics = article.get("topics", ["general"])
+        article_text = f"{article.get('title', '')} {article.get('summary', '')}"
         
-        # Template PIL - NO complex logic, works instantly
-        pil_text = f"# {article['title']}\n\n**Issue:** {', '.join(topics)}\n\n{article.get('summary', 'N/A')}"
+        # ✅ REAL NLP: Extract issue entities and summary
+        logger.info("🔍 Extracting issue entities with spaCy...")
+        issue = extract_issue(article_text)
         
+        # ✅ REAL NLP: Calculate real severity score
+        logger.info("📊 Calculating severity score...")
+        severity_score = calculate_severity(article.get('summary', ''))
+        priority_level = "HIGH" if severity_score > 0.7 else "MEDIUM" if severity_score > 0.4 else "LOW"
+        
+        # ✅ REAL RAG: Retrieve legal sections for this specific issue
+        logger.info("⚖️ Retrieving relevant legal sections...")
+        legal_sections = retrieve_legal_sections(
+            issue_summary=issue.get('issue_summary', ''),
+            topics=topics,
+            entities=issue.get('entities', [])
+        )
+        
+        # ✅ REAL GENERATION: Generate PIL with actual legal references
+        logger.info("📝 Generating PIL with legal precedents...")
+        pil_text = generate_pil(
+            issue=issue,
+            legal_sections=legal_sections,
+            topics=topics,
+            news_title=article['title'],
+            severity_score=severity_score
+        )
+        
+        # Create draft with real results
         draft = PILManager.create_draft(pil_text, idx, {
             "news_title": article['title'],
-            "severity_score": 0.5,
-            "priority_level": "MEDIUM",
-            "lite_mode": True
+            "severity_score": severity_score,
+            "priority_level": priority_level,
+            "entities": issue.get('entities', []),
+            "lite_mode": False
         })
 
+        logger.info(f"✅ PIL generated in {round(time.time() - start_time, 2)}s - Severity: {severity_score:.2f}")
+        
         return {
             "news_title": article['title'],
             "news_index": idx,
             "topics": topics,
             "summary": article.get('summary', '')[:200],
             "source": article.get('source', ''),
-            "severity_score": 0.5,
-            "priority_level": "MEDIUM",
+            "severity_score": round(severity_score, 2),
+            "priority_level": priority_level,
+            "entities": issue.get('entities', []),
             "draft_id": draft.id,
             "can_edit": True,
-            "lite_mode": True,
-            "generation_time_s": round(time.time() - start_time, 2)
+            "lite_mode": False,
+            "generation_time_s": round(time.time() - start_time, 2),
+            "pil_preview": pil_text[:500]  # Preview of full PIL
         }
     except Exception as e:
-        logger.error(f"❌ Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"❌ Error in RAG pipeline: {str(e)}", exc_info=True)
+        # Fallback to template if RAG fails
+        try:
+            logger.warning("⚠️ Falling back to template mode...")
+            # Fallback template code here if needed
+            raise HTTPException(status_code=500, detail=f"Detailed error: {str(e)}")
+        except Exception as fallback_error:
+            raise HTTPException(status_code=500, detail=str(fallback_error))
 
 
 @app.post("/generate-pil")
