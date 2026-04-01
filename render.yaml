@@ -26,9 +26,8 @@ services:
     autoDeploy: true
 
   # Static Frontend Service
-  - type: static
+  - type: static_site
     name: nyaylens-frontend
-    env: static
     buildCommand: echo "No build needed"
     staticPublishPath: ./frontend
     routes:
