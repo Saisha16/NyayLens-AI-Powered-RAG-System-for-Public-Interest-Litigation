@@ -12,6 +12,7 @@ import time
 import os
 from datetime import datetime
 from io import BytesIO
+from pathlib import Path
 
 # Optional rate limiting; start without if unavailable
 try:
@@ -45,6 +46,19 @@ from backend.validators import (
 from backend.explainability import SimpleExplainer
 from backend.pil_manager import PILManager, PILDraft
 
+# Helper function to get correct path to news file (works locally and on Render)
+def get_news_file_path():
+    """
+    Resolves the correct path to latest_news.json relative to project root.
+    Works both locally and on Render (where cwd might be backend/).
+    """
+    # Get backend module's directory
+    backend_dir = Path(__file__).parent
+    # Go up to project root
+    project_root = backend_dir.parent
+    # Construct path to data file
+    news_file = project_root / "data" / "news" / "latest_news.json"
+    return str(news_file)
 
 app = FastAPI(
     title=config.API_TITLE,
@@ -186,7 +200,7 @@ def list_news(
     - date_from: Start date for range filter (YYYY-MM-DD)
     - date_to: End date for range filter (YYYY-MM-DD)
     """
-    news_file = "data/news/latest_news.json"
+    news_file = get_news_file_path()
     if not os.path.exists(news_file):
         logger.warning("News file missing; returning empty list")
         return {"items": [], "total": 0}
@@ -249,7 +263,7 @@ def list_news(
 
 @app.get("/topics")
 def list_topics():
-    news_file = "data/news/latest_news.json"
+    news_file = get_news_file_path()
     if not os.path.exists(news_file):
         logger.warning("News file missing; returning empty topics")
         return {"topics": []}
@@ -264,7 +278,7 @@ def list_topics():
 
 @app.get("/generate-pil")
 def generate_pil_from_news(idx: int = Query(0, ge=0), topic: str | None = Query(None)):
-    news_file = "data/news/latest_news.json"
+    news_file = get_news_file_path()
     if not os.path.exists(news_file):
         logger.warning("News file missing; cannot generate PIL")
         raise HTTPException(status_code=400, detail="News data not available; run ingestion first")
