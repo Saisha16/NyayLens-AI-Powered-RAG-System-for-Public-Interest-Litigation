@@ -395,7 +395,7 @@ class PILManager:
     @staticmethod
     def _parse_pil_sections(pil_text: str) -> Dict[str, Any]:
         """
-        Parse PIL text to extract sections
+        Parse PIL text to extract sections (supports BOTH markdown ## format AND old: format)
         Returns dict with facts, fundamental_rights, directive_principles, case_precedents, prayer
         """
         sections = {
@@ -406,111 +406,143 @@ class PILManager:
             "prayer": ""
         }
         
-        # Simple parsing - extract text between section markers
         try:
-            # Match both old and new template formats
-            if "Facts of the Case:" in pil_text:
-                start = pil_text.find("Facts of the Case:") + len("Facts of the Case:")
-                end = pil_text.find("Legal Grounds:") if "Legal Grounds:" in pil_text else len(pil_text)
-                sections["facts"] = pil_text[start:end].strip()
-            elif "FACTS OF THE CASE" in pil_text:
-                start = pil_text.find("FACTS OF THE CASE") + len("FACTS OF THE CASE")
-                end = pil_text.find("GROUNDS FOR FILING") if "GROUNDS FOR FILING" in pil_text else len(pil_text)
-                sections["facts"] = pil_text[start:end].strip()
-            
-            # Extract fundamental rights from Legal Grounds section
-            if "FUNDAMENTAL RIGHTS VIOLATED:" in pil_text:
-                start = pil_text.find("FUNDAMENTAL RIGHTS VIOLATED:") + len("FUNDAMENTAL RIGHTS VIOLATED:")
-                # Find end marker (next section or Prayer)
-                end_markers = ["DIRECTIVE PRINCIPLES OF STATE POLICY:", "RELEVANT CASE PRECEDENTS:", "Prayer:", "OTHER CONSTITUTIONAL"]
-                end = len(pil_text)
-                for marker in end_markers:
-                    pos = pil_text.find(marker, start)
-                    if pos != -1 and pos < end:
-                        end = pos
+            # MARKDOWN FORMAT PARSING (## headings - REAL RAG output)
+            if "## Facts of the Case" in pil_text or "## Fundamental Rights Violated" in pil_text:
+                print("✅ Parsing markdown-format PIL (## headings)")
                 
-                rights_text = pil_text[start:end]
-                # Split by newlines and filter
-                sections["fundamental_rights"] = [
-                    line.strip() for line in rights_text.split('\n') 
-                    if line.strip() and not line.strip().startswith('═') and len(line.strip()) > 10
-                ]
-            
-            # Extract directive principles
-            if "DIRECTIVE PRINCIPLES OF STATE POLICY:" in pil_text:
-                start = pil_text.find("DIRECTIVE PRINCIPLES OF STATE POLICY:") + len("DIRECTIVE PRINCIPLES OF STATE POLICY:")
-                end_markers = ["RELEVANT CASE PRECEDENTS:", "APPLICABLE STATUTORY PROVISIONS", "Prayer:", "OTHER CONSTITUTIONAL", "Filed in public"]
-                end = len(pil_text)
-                for marker in end_markers:
-                    pos = pil_text.find(marker, start)
-                    if pos != -1 and pos < end:
-                        end = pos
+                # Extract Facts of the Case
+                if "## Facts of the Case" in pil_text:
+                    start = pil_text.find("## Facts of the Case") + len("## Facts of the Case")
+                    # Find next ## heading
+                    next_section_pos = pil_text.find("##", start + 2)
+                    end = next_section_pos if next_section_pos != -1 else len(pil_text)
+                    sections["facts"] = pil_text[start:end].strip()
                 
-                principles_text = pil_text[start:end]
-                sections["directive_principles"] = [
-                    line.strip() for line in principles_text.split('\n')
-                    if line.strip() and not line.strip().startswith('═') and len(line.strip()) > 10
-                ]
-            
-            # Post-process: If directive_principles contains "APPLICABLE STATUTORY PROVISIONS AND PRECEDENTS:",
-            # move everything after that to case_precedents
-            if sections["directive_principles"]:
-                case_marker_idx = -1
-                for idx, item in enumerate(sections["directive_principles"]):
-                    if "APPLICABLE STATUTORY PROVISIONS AND PRECEDENTS:" in item:
-                        case_marker_idx = idx
-                        break
+                # Extract Fundamental Rights Violated
+                if "## Fundamental Rights Violated" in pil_text:
+                    start = pil_text.find("## Fundamental Rights Violated") + len("## Fundamental Rights Violated")
+                    next_section_pos = pil_text.find("##", start + 2)
+                    end = next_section_pos if next_section_pos != -1 else len(pil_text)
+                    rights_text = pil_text[start:end].strip()
+                    sections["fundamental_rights"] = [
+                        line.strip() for line in rights_text.split('\n')
+                        if line.strip() and line.strip().startswith('-')
+                    ]
+                    # Remove leading dash
+                    sections["fundamental_rights"] = [
+                        r.lstrip('- ').strip() for r in sections["fundamental_rights"]
+                    ]
                 
-                if case_marker_idx != -1:
-                    # Extract case precedents starting from the marker
-                    sections["case_precedents"] = sections["directive_principles"][case_marker_idx + 1:]
-                    # Keep only directive principles before the marker
-                    sections["directive_principles"] = sections["directive_principles"][:case_marker_idx]
-            
-            # Extract case precedents from "APPLICABLE STATUTORY PROVISIONS AND PRECEDENTS:" section (if not already done)
-            if not sections["case_precedents"] and "APPLICABLE STATUTORY PROVISIONS AND PRECEDENTS:" in pil_text:
-                start = pil_text.find("APPLICABLE STATUTORY PROVISIONS AND PRECEDENTS:") + len("APPLICABLE STATUTORY PROVISIONS AND PRECEDENTS:")
-                end_markers = ["Prayer:", "Filed in public", "Date:", "PRAYER FOR RELIEF"]
-                end = len(pil_text)
-                for marker in end_markers:
-                    pos = pil_text.find(marker, start)
-                    if pos != -1 and pos < end:
-                        end = pos
+                # Extract Directive Principles
+                if "## Directive Principles" in pil_text:
+                    start = pil_text.find("## Directive Principles") + len("## Directive Principles")
+                    next_section_pos = pil_text.find("##", start + 2)
+                    end = next_section_pos if next_section_pos != -1 else len(pil_text)
+                    principles_text = pil_text[start:end].strip()
+                    sections["directive_principles"] = [
+                        line.strip() for line in principles_text.split('\n')
+                        if line.strip() and line.strip().startswith('-')
+                    ]
+                    # Remove leading dash
+                    sections["directive_principles"] = [
+                        p.lstrip('- ').strip() for p in sections["directive_principles"]
+                    ]
                 
-                provisions_text = pil_text[start:end]
-                sections["case_precedents"] = [
-                    line.strip() for line in provisions_text.split('\n')
-                    if line.strip() and not line.strip().startswith('═') and len(line.strip()) > 10
-                ]
-            # Also check for "RELEVANT CASE PRECEDENTS:" as fallback
-            elif not sections["case_precedents"] and "RELEVANT CASE PRECEDENTS:" in pil_text:
-                start = pil_text.find("RELEVANT CASE PRECEDENTS:") + len("RELEVANT CASE PRECEDENTS:")
-                end_markers = ["Prayer:", "Filed in public", "Date:"]
-                end = len(pil_text)
-                for marker in end_markers:
-                    pos = pil_text.find(marker, start)
-                    if pos != -1 and pos < end:
-                        end = pos
+                # Extract Case Precedents
+                if "## Case Precedents" in pil_text:
+                    start = pil_text.find("## Case Precedents") + len("## Case Precedents")
+                    next_section_pos = pil_text.find("##", start + 2)
+                    end = next_section_pos if next_section_pos != -1 else len(pil_text)
+                    cases_text = pil_text[start:end].strip()
+                    sections["case_precedents"] = [
+                        line.strip() for line in cases_text.split('\n')
+                        if line.strip() and line.strip().startswith('-')
+                    ]
+                    # Remove leading dash
+                    sections["case_precedents"] = [
+                        c.lstrip('- ').strip() for c in sections["case_precedents"]
+                    ]
                 
-                cases_text = pil_text[start:end]
-                sections["case_precedents"] = [
-                    line.strip() for line in cases_text.split('\n')
-                    if line.strip() and not line.strip().startswith('═') and len(line.strip()) > 10
-                ]
+                # Extract Prayer for Relief
+                if "## Prayer for Relief" in pil_text:
+                    start = pil_text.find("## Prayer for Relief") + len("## Prayer for Relief")
+                    sections["prayer"] = pil_text[start:].strip()
+                    # Remove numbered list bullets if present
+                    prayer_lines = []
+                    for line in sections["prayer"].split('\n'):
+                        if line.strip():
+                            # Remove "1.", "2.", etc.
+                            cleaned = line.strip()
+                            if cleaned and cleaned[0].isdigit() and cleaned[1] in '.):':
+                                cleaned = cleaned[2:].strip()
+                            prayer_lines.append(cleaned)
+                    sections["prayer"] = '\n'.join(prayer_lines)
             
-            # Extract prayer
-            if "Prayer:" in pil_text:
-                start = pil_text.find("Prayer:") + len("Prayer:")
-                end = pil_text.find("Filed in public") if "Filed in public" in pil_text else len(pil_text)
-                sections["prayer"] = pil_text[start:end].strip()
-            elif "PRAYER FOR RELIEF" in pil_text:
-                start = pil_text.find("PRAYER FOR RELIEF") + len("PRAYER FOR RELIEF")
-                end = len(pil_text)
-                sections["prayer"] = pil_text[start:end].strip()
+            # OLD FORMAT PARSING (: format - fallback for compatibility)
+            else:
+                print("⚠️ Parsing old-format PIL (with colons)")
+                
+                if "Facts of the Case:" in pil_text:
+                    start = pil_text.find("Facts of the Case:") + len("Facts of the Case:")
+                    end = pil_text.find("Legal Grounds:") if "Legal Grounds:" in pil_text else len(pil_text)
+                    sections["facts"] = pil_text[start:end].strip()
+                
+                if "FUNDAMENTAL RIGHTS VIOLATED:" in pil_text:
+                    start = pil_text.find("FUNDAMENTAL RIGHTS VIOLATED:") + len("FUNDAMENTAL RIGHTS VIOLATED:")
+                    end_markers = ["DIRECTIVE PRINCIPLES", "RELEVANT CASE PRECEDENTS", "Prayer", "OTHER CONSTITUTIONAL"]
+                    end = len(pil_text)
+                    for marker in end_markers:
+                        pos = pil_text.find(marker, start)
+                        if pos != -1 and pos < end:
+                            end = pos
+                    
+                    rights_text = pil_text[start:end]
+                    sections["fundamental_rights"] = [
+                        line.strip() for line in rights_text.split('\n')
+                        if line.strip() and len(line.strip()) > 10
+                    ]
+                
+                if "DIRECTIVE PRINCIPLES" in pil_text:
+                    start = pil_text.find("DIRECTIVE PRINCIPLES") + len("DIRECTIVE PRINCIPLES")
+                    end_markers = ["RELEVANT CASE PRECEDENTS", "Prayer", "OTHER CONSTITUTIONAL"]
+                    end = len(pil_text)
+                    for marker in end_markers:
+                        pos = pil_text.find(marker, start)
+                        if pos != -1 and pos < end:
+                            end = pos
+                    
+                    principles_text = pil_text[start:end]
+                    sections["directive_principles"] = [
+                        line.strip() for line in principles_text.split('\n')
+                        if line.strip() and len(line.strip()) > 10
+                    ]
+                
+                if "RELEVANT CASE PRECEDENTS" in pil_text or "APPLICABLE STATUTORY PROVISIONS" in pil_text:
+                    marker = "RELEVANT CASE PRECEDENTS" if "RELEVANT CASE PRECEDENTS" in pil_text else "APPLICABLE STATUTORY PROVISIONS"
+                    start = pil_text.find(marker) + len(marker)
+                    end_markers = ["Prayer", "Filed in public"]
+                    end = len(pil_text)
+                    for m in end_markers:
+                        pos = pil_text.find(m, start)
+                        if pos != -1 and pos < end:
+                            end = pos
+                    
+                    cases_text = pil_text[start:end]
+                    sections["case_precedents"] = [
+                        line.strip() for line in cases_text.split('\n')
+                        if line.strip() and len(line.strip()) > 10
+                    ]
+                
+                if "Prayer" in pil_text:
+                    start = pil_text.find("Prayer") + len("Prayer")
+                    end = pil_text.find("Filed in public") if "Filed in public" in pil_text else len(pil_text)
+                    sections["prayer"] = pil_text[start:end].strip()
         
         except Exception as e:
-            print(f"Error parsing PIL sections: {e}")
+            print(f"❌ Error parsing PIL sections: {e}")
         
+        print(f"📊 Parsed: facts={len(sections['facts'])} chars, rights={len(sections['fundamental_rights'])}, principles={len(sections['directive_principles'])}, cases={len(sections['case_precedents'])}, prayer={len(sections['prayer'])} chars")
         return sections
 
 

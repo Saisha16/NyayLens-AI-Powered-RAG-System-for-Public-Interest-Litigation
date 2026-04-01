@@ -366,7 +366,7 @@ async function generatePIL(idx = null, auto = false) {
         document.getElementById("newsTitle").innerText = data.news_title || "No title";
         document.getElementById("severityScore").innerText = data.severity_score ?? "—";
 
-        excerptEl.textContent = data.excerpt || "—";
+        excerptEl.textContent = data.summary || data.excerpt || "—";
         if (data.news_index !== undefined) {
             newsSelect.value = data.news_index;
         }
@@ -377,7 +377,9 @@ async function generatePIL(idx = null, auto = false) {
 
         const entityList = document.getElementById("entityList");
         entityList.innerHTML = "";
-        (data.entities_detected || []).forEach(ent => {
+        // Support both 'entities' and 'entities_detected' field names
+        const entityArray = data.entities || data.entities_detected || [];
+        entityArray.forEach(ent => {
             const li = document.createElement("li");
             li.innerText = ent;
             entityList.appendChild(li);
