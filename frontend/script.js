@@ -354,16 +354,28 @@ async function generatePIL(idx = null, auto = false) {
     const selIdx = idx !== null ? idx : Number(newsSelect.value || 0);
     const topicVal = topicSelect.value || "";
     const topicParam = topicVal ? `&topic=${encodeURIComponent(topicVal)}` : "";
+    
+    console.log("🚀 generatePIL started:", { selIdx, API_URL, auto });
     setStatus(auto ? "Loading PIL..." : "Generating PIL...", "info");
+    
     try {
         const headers = authToken ? {"Authorization": `Bearer ${authToken}`} : {};
-        const response = await fetch(`${API_URL}/generate-pil?idx=${selIdx}${topicParam}`, { headers });
+        const url = `${API_URL}/generate-pil?idx=${selIdx}${topicParam}`;
+        console.log("📡 Fetching:", url);
+        
+        const response = await fetch(url, { headers });
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}`);
         }
         const data = await response.json();
+        console.log("✅ PIL data received:", data);
 
-        document.getElementById("newsTitle").innerText = data.news_title || "No title";
+        // Update Title
+        const titleEl = document.getElementById("newsTitle");
+        if (titleEl) {
+            titleEl.innerText = data.news_title || "No title";
+            console.log("✓ Title updated:", data.news_title);
+        }
         
         // Display severity score - show as score/10 format
         const severityEl = document.getElementById("severityScore");
@@ -371,50 +383,64 @@ async function generatePIL(idx = null, auto = false) {
             severityEl.innerText = typeof data.severity_score === 'number' 
                 ? (data.severity_score * 10).toFixed(1) + " / 10" 
                 : "—";
+            console.log("✓ Severity updated:", data.severity_score);
         }
 
         // Display summary/excerpt
-        excerptEl.textContent = data.summary || data.excerpt || "—";
+        if (excerptEl) {
+            excerptEl.textContent = data.summary || data.excerpt || "—";
+            console.log("✓ Excerpt updated");
+        }
+        
         if (data.news_index !== undefined) {
             newsSelect.value = data.news_index;
         }
 
         // Display priority level with color coding
         const priority = document.getElementById("priorityLevel");
-        priority.innerText = data.priority_level || "—";
-        priority.className = (data.priority_level || "").toUpperCase();
+        if (priority) {
+            priority.innerText = data.priority_level || "—";
+            priority.className = (data.priority_level || "").toUpperCase();
+            console.log("✓ Priority updated:", data.priority_level);
+        }
 
         // Display topics
         const topicsEl = document.querySelector('[data-topics]') || document.getElementById("topics");
         if (topicsEl && data.topics && data.topics.length > 0) {
             topicsEl.innerText = data.topics.join(", ");
+            console.log("✓ Topics updated:", data.topics);
         }
 
         // Display extracted entities
         const entityList = document.getElementById("entityList");
-        entityList.innerHTML = "";
-        // Support both 'entities' and 'entities_detected' field names
-        const entityArray = data.entities || data.entities_detected || [];
-        entityArray.forEach(ent => {
-            const li = document.createElement("li");
-            li.innerText = ent;
-            entityList.appendChild(li);
-        });
+        if (entityList) {
+            entityList.innerHTML = "";
+            // Support both 'entities' and 'entities_detected' field names
+            const entityArray = data.entities || data.entities_detected || [];
+            console.log("📊 Displaying", entityArray.length, "entities:", entityArray);
+            
+            entityArray.forEach(ent => {
+                const li = document.createElement("li");
+                li.innerText = ent;
+                entityList.appendChild(li);
+            });
+        }
 
         // Store draft ID for later use
         if (data.draft_id) {
             currentDraftId = data.draft_id;
-            console.log("Draft created:", currentDraftId);
+            console.log("💾 Draft ID stored:", currentDraftId);
         }
 
         // Display legal sources with relevance
         if (data.legal_sources_used) {
-            console.log("Legal sources:", data.legal_sources_used);
+            console.log("⚖️ Legal sources:", data.legal_sources_used);
         }
 
-        setStatus("PIL Generated! Click 'View & Edit PIL' to customize.", "success");
+        setStatus("✅ PIL Generated! Click 'View & Edit PIL' to customize.", "success");
+        console.log("🎉 generatePIL completed successfully");
     } catch (err) {
-        console.error("generatePIL error", err);
+        console.error("❌ generatePIL error:", err);
         setStatus("Backend unreachable or error: " + err.message, "error");
     }
 }
