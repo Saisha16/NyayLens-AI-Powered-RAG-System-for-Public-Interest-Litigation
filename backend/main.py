@@ -420,6 +420,13 @@ def generate_pil_from_news(idx: int = Query(0, ge=0), topic: str | None = Query(
 
         logger.info(f"Starting PIL processing for article {idx} (full_rag: {full_rag})")
         start_time = time.time()
+        
+        # Initialize variables before try block (so except handler can use them)
+        issue = None
+        severity = 0.5
+        legal_sections = []
+        pil_draft_text = ""
+        lite = True  # Default to lite
 
         try:
             if full_rag:
