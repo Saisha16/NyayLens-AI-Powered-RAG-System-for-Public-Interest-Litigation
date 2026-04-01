@@ -1,7 +1,12 @@
-import spacy
 import os
 from backend.config import config
 import logging
+
+# Conditional spacy import (won't break if not installed)
+try:
+    import spacy
+except ImportError:
+    spacy = None
 
 logger = logging.getLogger("nyaylens")
 
@@ -15,6 +20,11 @@ def get_nlp_model():
     # Check if we're on Render (free tier) - skip spaCy to save memory
     if os.environ.get('RENDER') or os.environ.get('RENDER_USE_PAGER'):
         logger.info("🔍 Running on Render free tier - using NLP fallback mode")
+        return None
+    
+    # Check if spacy is even installed
+    if spacy is None:
+        logger.info("🔍 spaCy not installed - using NLP fallback mode")
         return None
     
     if _nlp_model is None:
