@@ -1,8 +1,40 @@
 import spacy
 from backend.config import config
+import logging
 
+logger = logging.getLogger("nyaylens")
 
-nlp = spacy.load("en_core_web_sm")
+# Lazy-load spacy model to avoid Render deployment timeouts
+_nlp_model = None
+
+def get_nlp_model():
+    """Lazy-load spacy model on first use"""
+    global _nlp_model
+    
+    if _nlp_model is None:
+        try:
+            logger.info("Loading spaCy model en_core_web_sm...")
+            _nlp_model = spacy.load("en_core_web_sm")
+            logger.info("✓ spaCy model loaded successfully")
+        except OSError:
+            logger.warning("⚠️ spaCy model not found, downloading...")
+            try:
+                import subprocess
+                import sys
+                subprocess.check_call(
+                    [sys.executable, "-m", "spacy", "download", "en_core_web_sm", "--quiet"],
+                    timeout=120
+                )
+                _nlp_model = spacy.load("en_core_web_sm")
+                logger.info("✓ spaCy model downloaded and loaded")
+            except Exception as e:
+                logger.error(f"❌ Failed to load spaCy model: {e}")
+                _nlp_model = False
+    
+    return _nlp_model if _nlp_model is not False else None
+
+# Initialize model on first request, not on import
+nlp = None
 
 
 def extract_issue(article_text: str):
@@ -18,7 +50,16 @@ def extract_issue(article_text: str):
             pass  # Fall back to spaCy
     
     # Fallback: spaCy-based extraction
-    doc = nlp(article_text)
+    nlp_model = get_nlp_model()
+    if nlp_model is None:
+        # Fallback if spacy model unavailable
+        logger.warning("spaCy model unavailable, using basic extraction")
+        return {
+            "issue_summary": article_text[:600],
+            "entities": []
+        }
+    
+    doc = nlp_model(article_text)
 
     entities = []
     for ent in doc.ents:
