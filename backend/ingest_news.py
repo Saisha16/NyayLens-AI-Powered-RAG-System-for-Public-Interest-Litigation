@@ -3,11 +3,13 @@ from newspaper import Article
 import uuid
 import json
 from datetime import datetime
-import spacy
+try:
+    import spacy
+    nlp = spacy.load("en_core_web_sm")
+except (ImportError, OSError):
+    spacy = None
+    nlp = None
 from collections import Counter
-
-# Load spaCy model for NLP-based topic classification
-nlp = spacy.load("en_core_web_sm")
 
 # Enhanced topic keyword mapping with weights
 TOPIC_KEYWORDS = {

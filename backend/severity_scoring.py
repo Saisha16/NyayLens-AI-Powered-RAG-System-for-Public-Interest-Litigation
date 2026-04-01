@@ -14,12 +14,18 @@ from __future__ import annotations
 
 import re
 from typing import Iterable
-import spacy
+try:
+    import spacy
+except ImportError:
+    spacy = None
 
 # Load spaCy model for lemmatization
-try:
-    nlp = spacy.load("en_core_web_sm")
-except OSError:
+if spacy:
+    try:
+        nlp = spacy.load("en_core_web_sm")
+    except OSError:
+        nlp = None
+else:
     nlp = None
 
 

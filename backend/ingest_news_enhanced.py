@@ -5,7 +5,10 @@ from newspaper import Article
 import uuid
 import json
 from datetime import datetime, timedelta
-import spacy
+try:
+    import spacy
+except ImportError:
+    spacy = None
 from collections import Counter
 import os
 from typing import Optional
