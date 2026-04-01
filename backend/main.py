@@ -364,7 +364,7 @@ def generate_pil_from_news(idx: int = Query(0, ge=0), topic: str | None = Query(
         full_rag: If True, use full RAG pipeline (slower, needs more memory). Default: Fast mode
     """
     try:
-        logger.info(f"PIL generation started for article idx={idx}, topic={topic}, full_rag={full_rag}")
+        logger.info(f"✨ [v2.0.0-FIXED] PIL generation started for article idx={idx}, full_rag={full_rag} ✨")
         
         news_file = get_news_file_path()
         if not os.path.exists(news_file):
