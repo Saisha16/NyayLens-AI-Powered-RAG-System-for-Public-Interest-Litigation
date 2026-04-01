@@ -51,14 +51,30 @@ def get_news_file_path():
     """
     Resolves the correct path to latest_news.json relative to project root.
     Works both locally and on Render (where cwd might be backend/).
+    Uses multiple strategies to find the FILE:
+    1. Relative to this module (__file__)
+    2. Relative to current working directory
+    3. Check common Render deployment paths
     """
-    # Get backend module's directory
-    backend_dir = Path(__file__).parent
-    # Go up to project root
-    project_root = backend_dir.parent
-    # Construct path to data file
-    news_file = project_root / "data" / "news" / "latest_news.json"
-    return str(news_file)
+    # Strategy 1: Relative to this module (main.py in backend/)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(script_dir)
+    path1 = os.path.join(project_root, "data", "news", "latest_news.json")
+    if os.path.exists(path1):
+        return path1
+    
+    # Strategy 2: Try from current working directory
+    path2 = os.path.join(os.getcwd(), "data", "news", "latest_news.json")
+    if os.path.exists(path2):
+        return path2
+    
+    # Strategy 3: Try parent of cwd (in case cwd is backend/)
+    path3 = os.path.join(os.getcwd(), "..", "data", "news", "latest_news.json")
+    if os.path.exists(path3):
+        return path3
+    
+    # Default to strategy 1 path (even if it doesn't exist yet)
+    return path1
 
 app = FastAPI(
     title=config.API_TITLE,
@@ -161,6 +177,13 @@ def health_check():
 @app.get("/debug/news-path")
 def debug_news_path():
     """Debug endpoint to show resolved news file path and file status."""
+    # Show all attempted paths
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(script_dir)
+    path1 = os.path.join(project_root, "data", "news", "latest_news.json")
+    path2 = os.path.join(os.getcwd(), "data", "news", "latest_news.json")
+    path3 = os.path.join(os.getcwd(), "..", "data", "news", "latest_news.json")
+    
     news_file = get_news_file_path()
     exists = os.path.exists(news_file)
     size = os.path.getsize(news_file) if exists else 0
@@ -171,14 +194,19 @@ def debug_news_path():
                 data = json.load(f)
                 count = len(data)
         except Exception as e:
-            count = f"Error reading: {str(e)}"
+            count = f"Error: {str(e)}"
     
     return {
-        "resolved_path": str(news_file),
-        "exists": exists,
+        "resolved_path": news_file,
+        "file_exists": exists,
         "file_size_bytes": size,
         "articles_count": count,
-        "current_working_directory": os.getcwd()
+        "current_working_directory": os.getcwd(),
+        "attempted_paths": {
+            "strategy_1_from_module": {"path": path1, "exists": os.path.exists(path1)},
+            "strategy_2_from_cwd": {"path": path2, "exists": os.path.exists(path2)},
+            "strategy_3_from_cwd_parent": {"path": path3, "exists": os.path.exists(path3)}
+        }
     }
 
 @app.post("/token")
