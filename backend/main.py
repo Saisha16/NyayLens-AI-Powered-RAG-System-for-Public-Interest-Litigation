@@ -1,5 +1,7 @@
 import logging
-from fastapi import FastAPI, Query, Body
+from fastapi import FastAPI, Query, Body, HTTPException
+import signal
+from contextlib import contextmanager
 from threading import Thread
 from backend.scheduler import start_scheduler
 
@@ -13,6 +15,8 @@ import os
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
+import signal
+import threading
 
 # Optional rate limiting; start without if unavailable
 try:
@@ -352,88 +356,243 @@ def list_topics():
     return {"topics": sorted(topics)}
 
 
+class TimeoutError(Exception):
+    """Custom timeout exception"""
+    pass
+
+
+def run_with_timeout(func, timeout_seconds, *args, **kwargs):
+    """Run function with timeout (works on Unix/Linux, not Windows)"""
+    try:
+        if hasattr(signal, 'alarm'):
+            # Unix/Linux: use signal
+            def timeout_handler(signum, frame):
+                raise TimeoutError(f"Operation timed out after {timeout_seconds}s")
+            
+            old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(timeout_seconds)
+            try:
+                result = func(*args, **kwargs)
+            finally:
+                signal.alarm(0)
+                signal.signal(signal.SIGALRM, old_handler)
+            return result
+        else:
+            # Windows or no signal support: just run normally
+            logger.warning("Timeout not supported on this platform, running without timeout")
+            return func(*args, **kwargs)
+    except TimeoutError as e:
+        logger.error(f"Timeout: {str(e)}")
+        raise
+
+
 @app.get("/generate-pil")
-def generate_pil_from_news(idx: int = Query(0, ge=0), topic: str | None = Query(None)):
-    news_file = get_news_file_path()
-    if not os.path.exists(news_file):
-        logger.warning("News file missing; cannot generate PIL")
-        raise HTTPException(status_code=400, detail="News data not available; run ingestion first")
-
-    with open(news_file, "r", encoding="utf-8") as f:
-        news = json.load(f)
-
-    if topic:
-        topic_lower = topic.lower()
-        news = [n for n in news if topic_lower in [t.lower() for t in n.get("topics", [])]]
-
-    if not news:
-        return {"error": "No news available. Run ingest first or adjust topic."}
-
-    idx = min(idx, len(news) - 1)
-    article = news[idx]
-    all_texts = [n["text"] for n in news]
-
-    # Extract issue and entities using NLP
-    issue = extract_issue(article["text"])
+def generate_pil_from_news(idx: int = Query(0, ge=0), topic: str | None = Query(None), lite: bool = Query(False)):
+    """Generate PIL from news article (with timeout protection for free tier).
     
-    # Calculate severity score
-    severity = calculate_severity(article["text"], all_texts)
-    
-    # Get article topics
-    article_topics = article.get("topics", ["general"])
+    Args:
+        idx: Article index
+        topic: Filter by topic
+        lite: If True, use lightweight mode (faster, less memory) - skip RAG + entity extraction
+    """
+    try:
+        logger.info(f"PIL generation started for article idx={idx}, topic={topic}, lite={lite}")
+        
+        news_file = get_news_file_path()
+        if not os.path.exists(news_file):
+            logger.warning("News file missing; cannot generate PIL")
+            raise HTTPException(status_code=400, detail="News data not available; run ingestion first")
 
-    # Retrieve constitutional provisions and legal sections using RAG
-    legal_sections = retrieve_legal_sections(
-        issue["issue_summary"], 
-        topics=article_topics,
-        entities=issue["entities"]
-    )
-    
-    # Generate PIL with constitutional references
-    pil_draft = generate_pil(
-        issue, 
-        legal_sections,
-        topics=article_topics,
-        news_title=article["title"],
-        severity_score=severity
-    )
-    
-    # Create and store PIL draft for editing
-    priority_level = (
-        "HIGH" if severity >= 0.75 else
-        "MEDIUM" if severity >= 0.4 else
-        "LOW"
-    )
-    
-    metadata = {
-        "news_title": article.get("title"),
-        "severity_score": severity,
-        "priority_level": priority_level,
-        "entities_detected": issue["entities"],
-        "legal_sources_used": [f"{l.get('category', 'Legal')}: {l['source']}" for l in legal_sections[:5]],
-        "topics": article_topics,
-        "source": article.get("source")
-    }
-    
-    # Store PIL draft for editing
-    draft = PILManager.create_draft(pil_draft, idx, metadata)
+        with open(news_file, "r", encoding="utf-8") as f:
+            news = json.load(f)
 
-    return {
-        "news_title": article.get("title"),
-        "news_index": idx,
-        "topics": article_topics,
-        "summary": article.get("summary"),
-        "source": article.get("source"),
-        "published": article.get("published"),
-        "excerpt": (article.get("text") or "")[:400],
-        "severity_score": round(severity, 3),
-        "priority_level": priority_level,
-        "entities_detected": issue["entities"],
-        "legal_sources_used": metadata["legal_sources_used"],
-        "constitutional_grounds": len([l for l in legal_sections if l.get("category") in ["Fundamental Right", "Directive Principle"]]),
-        "draft_id": draft.id,
-        "can_edit": True
-    }
+        if topic:
+            topic_lower = topic.lower()
+            news = [n for n in news if topic_lower in [t.lower() for t in n.get("topics", [])]]
+
+        if not news:
+            return {"error": "No news available. Run ingest first or adjust topic."}
+
+        idx = min(idx, len(news) - 1)
+        article = news[idx]
+        all_texts = [n["text"] for n in news]
+        article_topics = article.get("topics", ["general"])
+
+        logger.info(f"Starting PIL processing for article {idx} (lite mode: {lite})")
+        start_time = time.time()
+
+        try:
+            if lite:
+                # Lite mode: skip intensive NLP, use template-based PIL
+                logger.info("Using LITE mode - skipping heavy NLP processing")
+                
+                # Just extract severity without full NLP
+                try:
+                    severity = calculate_severity(article["text"], all_texts)
+                except Exception as e:
+                    logger.warning(f"Severity calculation skipped: {e}")
+                    severity = 0.5  # Default medium severity
+                
+                # Use mock legal sections to avoid RAG overhead
+                legal_sections = [
+                    {"category": "Fundamental Right", "source": "Article 21 - Right to Life", "detail": "Protection of life and personal liberty"},
+                    {"category": "Fundamental Right", "source": "Article 14 - Equality", "detail": "Equality before law"},
+                ]
+                
+                # Simple issue extraction without NLP
+                issue = {
+                    "issue_summary": article.get("summary", article["text"][:200]),
+                    "entities": article_topics
+                }
+                
+                # Generate lightweight PIL
+                pil_draft_text = f"""
+## {article.get('title', 'Public Interest Matter')}
+
+**Nature of Issue:** {', '.join(article_topics)}
+
+### Facts of the Case
+{article.get('summary', article['text'][:500])}
+
+### Grounds for PIL
+- Violation of fundamental rights as guaranteed by the Constitution
+- Matter of public interest requiring judicial intervention
+
+### Relief Sought
+1. Appropriate action by the concerned authorities
+2. Compensation to affected parties where applicable
+3. Implementation of preventive measures
+
+### Case Precedents
+- S.P. Gupta v. Union of India – Expanded locus standi in PIL
+- Bandhua Mukti Morcha v. Union of India – Epistolary jurisdiction
+"""
+                
+            else:
+                # Full mode: complete NLP processing with timeout protection
+                logger.info("Using FULL mode - running complete NLP pipeline with 25s timeout")
+                
+                def run_nlp():
+                    nonlocal issue, severity, legal_sections, pil_draft_text
+                    
+                    issue = extract_issue(article["text"])
+                    logger.info(f"✓ Issue extracted: {issue['issue_summary'][:80]}")
+                    
+                    severity = calculate_severity(article["text"], all_texts)
+                    logger.info(f"✓ Severity calculated: {severity}")
+                    
+                    legal_sections = retrieve_legal_sections(
+                        issue["issue_summary"], 
+                        topics=article_topics,
+                        entities=issue["entities"]
+                    )
+                    logger.info(f"✓ Retrieved {len(legal_sections)} legal sections")
+                    
+                    pil_draft_text = generate_pil(
+                        issue, 
+                        legal_sections,
+                        topics=article_topics,
+                        news_title=article["title"],
+                        severity_score=severity
+                    )
+                    logger.info(f"✓ PIL generated successfully")
+                
+                try:
+                    run_with_timeout(run_nlp, timeout_seconds=25)
+                except TimeoutError as te:
+                    logger.error(f"NLP pipeline timeout: {str(te)}")
+                    # Fallback to lite mode
+                    logger.info("Falling back to LITE mode due to timeout")
+                    lite = True
+                    # Re-run lite mode logic
+                    try:
+                        severity = calculate_severity(article["text"], all_texts)
+                    except Exception as e:
+                        severity = 0.5
+                    
+                    legal_sections = [
+                        {"category": "Fundamental Right", "source": "Article 21 - Right to Life", "detail": "Protection of life and personal liberty"},
+                        {"category": "Fundamental Right", "source": "Article 14 - Equality", "detail": "Equality before law"},
+                    ]
+                    
+                    issue = {
+                        "issue_summary": article.get("summary", article["text"][:200]),
+                        "entities": article_topics
+                    }
+                    
+                    pil_draft_text = f"""
+## {article.get('title', 'Public Interest Matter')}
+
+**Nature of Issue:** {', '.join(article_topics)}
+
+### Facts of the Case
+{article.get('summary', article['text'][:500])}
+
+### Grounds for PIL
+- Violation of fundamental rights as guaranteed by the Constitution
+- Matter of public interest requiring judicial intervention
+
+### Relief Sought
+1. Appropriate action by the concerned authorities
+2. Compensation to affected parties where applicable
+"""
+            
+            elapsed = time.time() - start_time
+            logger.info(f"PIL generation completed in {elapsed:.2f}s")
+            
+        except Exception as nlp_err:
+            elapsed = time.time() - start_time
+            logger.error(f"NLP processing failed after {elapsed:.2f}s: {str(nlp_err)}", exc_info=True)
+            return {
+                "error": f"PIL generation error. Try lite mode (?lite=true): {str(nlp_err)[:80]}",
+                "severity_score": None,
+                "can_edit": False
+            }
+        
+        # Create and store PIL draft
+        priority_level = (
+            "HIGH" if severity >= 0.75 else
+            "MEDIUM" if severity >= 0.4 else
+            "LOW"
+        )
+        
+        metadata = {
+            "news_title": article.get("title"),
+            "severity_score": severity,
+            "priority_level": priority_level,
+            "entities_detected": issue.get("entities", article_topics),
+            "legal_sources_used": [f"{l.get('category', 'Legal')}: {l['source']}" for l in legal_sections[:3]],
+            "topics": article_topics,
+            "source": article.get("source"),
+            "lite_mode": lite
+        }
+        
+        draft = PILManager.create_draft(pil_draft_text if lite else pil_draft_text, idx, metadata)
+
+        return {
+            "news_title": article.get("title"),
+            "news_index": idx,
+            "topics": article_topics,
+            "summary": article.get("summary")[:200] if article.get("summary") else "",
+            "source": article.get("source"),
+            "published": article.get("published"),
+            "excerpt": (article.get("text") or "")[:300],
+            "severity_score": round(severity, 3) if severity else 0.5,
+            "priority_level": priority_level,
+            "entities_detected": issue.get("entities", article_topics),
+            "legal_sources_used": metadata["legal_sources_used"],
+            "constitutional_grounds": len(legal_sections),
+            "draft_id": draft.id,
+            "can_edit": True,
+            "lite_mode": lite,
+            "generation_time_s": round(time.time() - start_time, 2)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in generate_pil_from_news: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"PIL generation failed. Retry with ?lite=true")
 
 
 @app.post("/generate-pil")
