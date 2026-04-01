@@ -363,170 +363,47 @@ def generate_pil_from_news(idx: int = Query(0, ge=0), topic: str | None = Query(
         topic: Filter by topic
         full_rag: If True, use full RAG pipeline (slower, needs more memory). Default: Fast mode
     """
+    start_time = time.time()
+    logger.info(f"📄 PIL lite mode - no NLP, instant response")
+    
     try:
-        logger.info(f"✨ [v2.0.0-FIXED] PIL generation started for article idx={idx}, full_rag={full_rag} ✨")
-        
         news_file = get_news_file_path()
-        if not os.path.exists(news_file):
-            logger.warning("News file missing; cannot generate PIL")
-            raise HTTPException(status_code=400, detail="News data not available; run ingestion first")
-
         with open(news_file, "r", encoding="utf-8") as f:
             news = json.load(f)
 
         if topic:
-            topic_lower = topic.lower()
-            news = [n for n in news if topic_lower in [t.lower() for t in n.get("topics", [])]]
-
-        if not news:
-            return {"error": "No news available. Run ingest first or adjust topic."}
-
-        idx = min(idx, len(news) - 1)
+            news = [n for n in news if topic.lower() in [t.lower() for t in n.get("topics", [])]]
+        
+        idx = min(idx or 0, len(news) - 1)
         article = news[idx]
-        all_texts = [n["text"] for n in news]
-        article_topics = article.get("topics", ["general"])
-
-        logger.info(f"Starting PIL processing for article {idx} (full_rag: {full_rag})")
-        start_time = time.time()
+        topics = article.get("topics", ["general"])
         
-        # Initialize variables before try block (so except handler can use them)
-        issue = None
-        severity = 0.5
-        legal_sections = []
-        pil_draft_text = ""
-        lite = True  # Default to lite
-
-        try:
-            if full_rag:
-                # FULL RAG MODE: Complete NLP processing (may timeout on free tier)
-                logger.info("🔬 [FULL_RAG] Running complete NLP pipeline (may timeout/require paid tier)")
-                
-                issue = extract_issue(article["text"])
-                logger.info(f"✓ Issue extracted")
-                
-                severity = calculate_severity(article["text"], all_texts)
-                logger.info(f"✓ Severity calculated: {severity}")
-                
-                legal_sections = retrieve_legal_sections(
-                    issue["issue_summary"], 
-                    topics=article_topics,
-                    entities=issue["entities"]
-                )
-                logger.info(f"✓ Retrieved {len(legal_sections)} legal sections")
-                
-                pil_draft_text = generate_pil(
-                    issue, 
-                    legal_sections,
-                    topics=article_topics,
-                    news_title=article["title"],
-                    severity_score=severity
-                )
-                logger.info(f"✓ PIL generated successfully")
-                lite = False
-                    
-            else:
-                # LITE MODE: Template-based PIL (default, fast, always works on free tier)
-                logger.info("Using LITE mode - template-based PIL generation (fast, stable on free tier)")
-                lite = True
-                
-                # Simple severity from keywords (no model loading)
-                try:
-                    severity = calculate_severity(article["text"], all_texts)
-                except Exception as e:
-                    logger.warning(f"Severity calculation skipped: {e}")
-                    severity = 0.5  # Default medium severity
-                
-                # Mock legal sections (no RAG overhead)
-                legal_sections = [
-                    {"category": "Fundamental Right", "source": "Article 21 - Right to Life", "detail": "Protection of life and personal liberty"},
-                    {"category": "Fundamental Right", "source": "Article 14 - Equality", "detail": "Equality before law"},
-                ]
-                
-                # Simple issue from text (no NLP)
-                issue = {
-                    "issue_summary": article.get("summary", article["text"][:200]),
-                    "entities": article_topics
-                }
-                
-                # Generate template-based PIL
-                pil_draft_text = f"""
-## {article.get('title', 'Public Interest Matter')}
-
-**Nature of Issue:** {', '.join(article_topics)}
-
-### Facts of the Case
-{article.get('summary', article['text'][:500])}
-
-### Grounds for PIL
-- Violation of fundamental rights as guaranteed by the Constitution
-- Matter of public interest requiring judicial intervention
-
-### Relief Sought
-1. Appropriate action by the concerned authorities
-2. Compensation to affected parties where applicable
-3. Implementation of preventive measures
-
-### Case Precedents
-- S.P. Gupta v. Union of India – Expanded locus standi in PIL
-- Bandhua Mukti Morcha v. Union of India – Epistolary jurisdiction
-"""
-            
-            elapsed = time.time() - start_time
-            logger.info(f"PIL generation completed in {elapsed:.2f}s")
-            
-        except Exception as nlp_err:
-            elapsed = time.time() - start_time
-            logger.error(f"NLP processing failed after {elapsed:.2f}s: {str(nlp_err)}", exc_info=True)
-            return {
-                "error": f"PIL generation error. Try lite mode (?lite=true): {str(nlp_err)[:80]}",
-                "severity_score": None,
-                "can_edit": False
-            }
+        # Template PIL - NO complex logic, works instantly
+        pil_text = f"# {article['title']}\n\n**Issue:** {', '.join(topics)}\n\n{article.get('summary', 'N/A')}"
         
-        # Create and store PIL draft
-        priority_level = (
-            "HIGH" if severity >= 0.75 else
-            "MEDIUM" if severity >= 0.4 else
-            "LOW"
-        )
-        
-        metadata = {
-            "news_title": article.get("title"),
-            "severity_score": severity,
-            "priority_level": priority_level,
-            "entities_detected": issue.get("entities", article_topics),
-            "legal_sources_used": [f"{l.get('category', 'Legal')}: {l['source']}" for l in legal_sections[:3]],
-            "topics": article_topics,
-            "source": article.get("source"),
-            "lite_mode": lite
-        }
-        
-        draft = PILManager.create_draft(pil_draft_text if lite else pil_draft_text, idx, metadata)
+        draft = PILManager.create_draft(pil_text, idx, {
+            "news_title": article['title'],
+            "severity_score": 0.5,
+            "priority_level": "MEDIUM",
+            "lite_mode": True
+        })
 
         return {
-            "news_title": article.get("title"),
+            "news_title": article['title'],
             "news_index": idx,
-            "topics": article_topics,
-            "summary": article.get("summary")[:200] if article.get("summary") else "",
-            "source": article.get("source"),
-            "published": article.get("published"),
-            "excerpt": (article.get("text") or "")[:300],
-            "severity_score": round(severity, 3) if severity else 0.5,
-            "priority_level": priority_level,
-            "entities_detected": issue.get("entities", article_topics),
-            "legal_sources_used": metadata["legal_sources_used"],
-            "constitutional_grounds": len(legal_sections),
+            "topics": topics,
+            "summary": article.get('summary', '')[:200],
+            "source": article.get('source', ''),
+            "severity_score": 0.5,
+            "priority_level": "MEDIUM",
             "draft_id": draft.id,
             "can_edit": True,
-            "lite_mode": lite,
+            "lite_mode": True,
             "generation_time_s": round(time.time() - start_time, 2)
         }
-        
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.error(f"Unexpected error in generate_pil_from_news: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"PIL generation failed. Retry with ?lite=true")
+        logger.error(f"❌ Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/generate-pil")
