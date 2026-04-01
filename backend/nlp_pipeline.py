@@ -21,18 +21,29 @@ def get_nlp_model():
             try:
                 import subprocess
                 import sys
-                # Try to download with explicit timeout
-                subprocess.run(
-                    [sys.executable, "-m", "spacy", "download", "en_core_web_sm", "--quiet"],
-                    timeout=300,
-                    check=True,
-                    capture_output=True
+                # Try to download with extended timeout (10 minutes)
+                logger.info("Downloading spaCy model (this may take 2-5 minutes)...")
+                result = subprocess.run(
+                    [sys.executable, "-m", "spacy", "download", "en_core_web_sm"],
+                    timeout=600,  # 10 minutes
+                    check=False,  # Don't raise on non-zero exit
+                    capture_output=True,
+                    text=True
                 )
-                _nlp_model = spacy.load("en_core_web_sm")
-                logger.info("✓ spaCy model downloaded and loaded successfully")
+                
+                if result.returncode == 0:
+                    logger.info("spaCy download output: " + result.stdout[:200])
+                    _nlp_model = spacy.load("en_core_web_sm")
+                    logger.info("✓ spaCy model downloaded and loaded successfully")
+                else:
+                    logger.error(f"spaCy download failed with code {result.returncode}")
+                    logger.error(f"stderr: {result.stderr[:500]}")
+                    _nlp_model = False
+            except subprocess.TimeoutExpired:
+                logger.error("❌ spaCy download timed out after 10 minutes")
+                _nlp_model = False
             except Exception as download_error:
-                logger.error(f"❌ Failed to download spaCy model: {download_error}")
-                # Return None - extract_issue will handle gracefully
+                logger.error(f"❌ Failed to download spaCy model: {download_error}", exc_info=True)
                 _nlp_model = False
     
     return _nlp_model if _nlp_model is not False else None

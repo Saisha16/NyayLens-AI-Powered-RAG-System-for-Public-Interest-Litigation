@@ -106,11 +106,24 @@ app = FastAPI(
     }
 )
 
-# Startup event: Ensure news file exists
+# Startup event: Ensure news file exists and spaCy model is available
 @app.on_event("startup")
 async def startup_events():
     """Initialize required files and background tasks on app startup."""
     ensure_news_file_exists()
+    
+    # Ensure spaCy model is available before serving requests
+    logger.info("🔍 Checking spaCy model availability on startup...")
+    try:
+        from backend.nlp_pipeline import get_nlp_model
+        nlp = get_nlp_model()
+        if nlp:
+            logger.info("✅ spaCy model ready for serving requests")
+        else:
+            logger.warning("⚠️ spaCy model failed to load - requests may fail gracefully")
+    except Exception as e:
+        logger.warning(f"⚠️ spaCy model check failed: {e}")
+    
     logger.info("Startup events completed")
 
 # Start scheduler in background thread
