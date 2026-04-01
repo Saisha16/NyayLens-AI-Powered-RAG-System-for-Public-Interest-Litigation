@@ -364,7 +364,7 @@ def generate_pil_from_news(idx: int = Query(0, ge=0), topic: str | None = Query(
         full_rag: If True, use full RAG pipeline (slower, needs more memory). Default: Fast mode
     """
     start_time = time.time()
-    logger.info(f"📄 PIL lite mode - no NLP, instant response")
+    logger.info(f"📄 v3.FORCE.REBUILD - PIL lite mode - no NLP, instant response")
     
     try:
         news_file = get_news_file_path()
