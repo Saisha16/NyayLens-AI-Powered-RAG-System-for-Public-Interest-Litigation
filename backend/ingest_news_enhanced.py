@@ -43,6 +43,10 @@ def _get_nlp():
     if _nlp is not None:
         return _nlp
 
+    # spaCy is optional on constrained hosts (e.g., Render free tier).
+    if spacy is None:
+        return None
+
     try:
         _nlp = spacy.load(
             "en_core_web_sm",
@@ -132,7 +136,7 @@ TOPIC_KEYWORDS = {
 def classify_topics_nlp(text: str):
     """Classify article into topics using NLP and keyword matching."""
     nlp = _get_nlp()
-    doc = nlp(text.lower())
+    doc = nlp(text.lower()) if nlp is not None else None
     text_lower = text.lower()
     
     topic_scores = {}
@@ -151,7 +155,9 @@ def classify_topics_nlp(text: str):
         if score > 0:
             topic_scores[topic] = score
     
-    entities = [ent.text.lower() for ent in doc.ents if ent.label_ in ["ORG", "GPE", "LAW", "EVENT"]]
+    entities = []
+    if doc is not None:
+        entities = [ent.text.lower() for ent in doc.ents if ent.label_ in ["ORG", "GPE", "LAW", "EVENT"]]
     
     entity_text = " ".join(entities)
     if "ministry" in entity_text or "government" in entity_text:
@@ -181,10 +187,12 @@ def extract_summary(text: str, max_sentences: int = 3) -> str:
     
     try:
         nlp = _get_nlp()
-        doc = nlp(text[:5000])  # Limit to first 5000 chars for speed
-        
-        # Extract sentences
-        sentences = [sent.text.strip() for sent in doc.sents]
+        if nlp is not None:
+            doc = nlp(text[:5000])  # Limit to first 5000 chars for speed
+            sentences = [sent.text.strip() for sent in doc.sents]
+        else:
+            # Lightweight sentence split fallback when spaCy is unavailable.
+            sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text[:5000]) if s.strip()]
         
         if len(sentences) <= max_sentences:
             return " ".join(sentences)
