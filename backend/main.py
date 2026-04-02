@@ -106,6 +106,18 @@ app = FastAPI(
     }
 )
 
+# Helper function to auto-fetch news in background
+def _auto_fetch_news_background():
+    """Fetch news in background thread to avoid blocking startup."""
+    try:
+        logger.info("📥 Background: Starting auto-fetch of news articles...")
+        from backend.ingest_news_enhanced import fetch_news
+        articles = fetch_news(days_back=1, max_per_feed=10)
+        logger.info(f"✅ Background: Auto-fetched {len(articles)} news articles")
+    except Exception as e:
+        logger.warning(f"⚠️ Background auto-fetch failed: {str(e)}")
+
+
 # Startup event: Ensure news file exists and spaCy model is available
 @app.on_event("startup")
 async def startup_events():
@@ -114,20 +126,20 @@ async def startup_events():
         ensure_news_file_exists()
         logger.info("✅ News file initialized")
         
-        # Check if news file is empty and auto-fetch if needed
+        # Check if news file is empty and auto-fetch in background if needed
         news_file = get_news_file_path()
         if os.path.exists(news_file):
-            with open(news_file, 'r') as f:
-                news_data = json.load(f)
-            
-            if not news_data or len(news_data) == 0:
-                logger.info("📥 News file empty - fetching initial news data...")
-                try:
-                    from backend.ingest_news_enhanced import fetch_news
-                    articles = fetch_news(days_back=1, max_per_feed=10)
-                    logger.info(f"✅ Auto-fetched {len(articles)} news articles on startup")
-                except Exception as fetch_err:
-                    logger.warning(f"⚠️ Auto-fetch failed (not critical): {str(fetch_err)}")
+            try:
+                with open(news_file, 'r') as f:
+                    news_data = json.load(f)
+                
+                if not news_data or len(news_data) == 0:
+                    # Spawn background thread for auto-fetch (don't block startup)
+                    fetch_thread = Thread(target=_auto_fetch_news_background, daemon=True)
+                    fetch_thread.start()
+                    logger.info("📥 Spawned background thread for news fetch")
+            except Exception as e:
+                logger.warning(f"⚠️ Could not check news file: {e}")
     except Exception as e:
         logger.error(f"❌ Failed to initialize news file: {e}")
     

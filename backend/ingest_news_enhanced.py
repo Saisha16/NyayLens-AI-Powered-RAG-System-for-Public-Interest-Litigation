@@ -305,24 +305,83 @@ def fetch_news(days_back: int = 7, max_per_feed: int = 10):
 
 
 def _fallback_extract(url: str) -> tuple[str, str]:
-    """Try to extract title and text using requests + simple paragraph scraping."""
+    """Try to extract title and text using requests + BeautifulSoup for robust parsing."""
     try:
-        resp = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+        resp = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"})
         html = resp.text
-        # Title via og:title or <title>
-        m = re.search(r'<meta[^>]+property=["\']og:title["\'][^>]+content=["\'](.*?)["\']', html, flags=re.I)
-        title = m.group(1) if m else (re.search(r"<title>(.*?)</title>", html, flags=re.I|re.S).group(1) if re.search(r"<title>(.*?)</title>", html, flags=re.I|re.S) else "Custom Article")
-        # Collect paragraph text
-        paras = re.findall(r"<p[^>]*>(.*?)</p>", html, flags=re.I|re.S)
-        text_chunks = []
-        for p in paras:
-            cleaned = re.sub(r"<[^>]+>", "", p)
-            cleaned = html_unescape.unescape(cleaned).strip()
-            if cleaned:
-                text_chunks.append(cleaned)
-        text = " ".join(text_chunks)
-        return title, text
-    except Exception:
+        
+        # Try BeautifulSoup for better HTML parsing
+        try:
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(html, 'html.parser')
+            
+            # Extract title - try multiple methods
+            title = None
+            # Method 1: og:title
+            og_title = soup.find('meta', property='og:title')
+            if og_title and og_title.get('content'):
+                title = og_title['content']
+            # Method 2: regular title tag
+            if not title and soup.title:
+                title = soup.title.string
+            # Method 3: h1 tag
+            if not title:
+                h1 = soup.find('h1')
+                if h1:
+                    title = h1.get_text()
+            title = title or "Custom Article"
+            
+            # Extract text from multiple sources
+            text_chunks = []
+            
+            # Try article/main content divs first
+            for selector in ['article', 'main', '[role="main"]', '.article-content', '.post-content', '.story-content']:
+                try:
+                    content = soup.select_one(selector)
+                    if content:
+                        # Get all paragraphs
+                        for p in content.find_all(['p', 'div', 'span']):
+                            text = p.get_text(strip=True)
+                            if text and len(text) > 20:
+                                text_chunks.append(text)
+                        if text_chunks:
+                            break
+                except:
+                    pass
+            
+            # Fallback: Get all paragraphs from page
+            if not text_chunks:
+                for p in soup.find_all(['p', 'article']):
+                    text = p.get_text(strip=True)
+                    if text and len(text) > 30:
+                        text_chunks.append(text)
+            
+            text = " ".join(text_chunks)
+            if text:
+                # Clean up whitespace
+                text = re.sub(r'\s+', ' ', text).strip()
+            
+            return title, text
+        
+        except ImportError:
+            # Fallback if BeautifulSoup not available - use simple regex
+            # Title via og:title or <title>
+            m = re.search(r'<meta[^>]+property=["\']og:title["\'][^>]+content=["\'](.*?)["\']', html, flags=re.I)
+            title = m.group(1) if m else (re.search(r"<title>(.*?)</title>", html, flags=re.I|re.S).group(1) if re.search(r"<title>(.*?)</title>", html, flags=re.I|re.S) else "Custom Article")
+            # Collect paragraph text
+            paras = re.findall(r"<p[^>]*>(.*?)</p>", html, flags=re.I|re.S)
+            text_chunks = []
+            for p in paras:
+                cleaned = re.sub(r"<[^>]+>", "", p)
+                cleaned = html_unescape.unescape(cleaned).strip()
+                if cleaned and len(cleaned) > 30:
+                    text_chunks.append(cleaned)
+            text = " ".join(text_chunks)
+            return title, text
+    
+    except Exception as e:
+        from backend.logger import logger
+        logger.warning(f"Fallback extraction failed: {str(e)[:100]}")
         return "Custom Article", ""
 
 
