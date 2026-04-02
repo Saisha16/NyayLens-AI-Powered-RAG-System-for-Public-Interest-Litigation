@@ -328,7 +328,7 @@ def _fallback_extract(url: str) -> tuple[str, str]:
 
 def add_custom_news(url: str, title: Optional[str] = None):
     """
-    Add a custom news article from a given URL.
+    Add a custom news article from a given URL with proper error handling and timeouts.
     
     Args:
         url: URL of the article
@@ -337,21 +337,50 @@ def add_custom_news(url: str, title: Optional[str] = None):
     Returns:
         Article dictionary or None if failed
     """
+    from backend.logger import logger
+    
     try:
-        article = Article(url)
-        article.download()
-        article.parse()
-
-        parsed_title = article.title or title or "Custom Article"
-        parsed_text = article.text or ""
-
-        # Fallback if parse text is too short
+        logger.info(f"📥 Attempting to fetch article from: {url}")
+        
+        # Try newspaper3k with timeout
+        try:
+            article = Article(url, timeout=10)
+            # Add headers to avoid being blocked
+            article.http_headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+            article.download()
+            article.parse()
+            logger.info(f"✅ Successfully parsed article with newspaper3k")
+        except Exception as e:
+            logger.warning(f"⚠️ newspaper3k failed ({str(e)[:100]}), trying fallback...")
+            parsed_title, parsed_text = _fallback_extract(url)
+            if not parsed_text or len(parsed_text) < 100:
+                logger.error(f"❌ Both newspaper3k and fallback failed for {url}")
+                raise ValueError(f"Could not extract content from URL")
+            article = None
+        
+        # Use newspaper3k results if available, otherwise use fallback
+        if article:
+            parsed_title = article.title or title or "Custom Article"
+            parsed_text = article.text or ""
+        else:
+            # Already set from fallback
+            parsed_title = title or parsed_title or "Custom Article"
+        
+        # Double fallback if text is too short
         if not parsed_text or len(parsed_text) < 300:
+            logger.info("Text too short, trying enhanced fallback...")
             fb_title, fb_text = _fallback_extract(url)
             parsed_title = title or parsed_title or fb_title
             if fb_text and len(fb_text) > len(parsed_text):
                 parsed_text = fb_text
         
+        if not parsed_text or len(parsed_text) < 100:
+            logger.error("Failed to extract meaningful content")
+            return None
+        
+        logger.info(f"📊 Classifying topics and extracting summary...")
         topics = classify_topics_nlp(parsed_text)
         summary = extract_summary(parsed_text, max_sentences=3)
         
@@ -367,6 +396,7 @@ def add_custom_news(url: str, title: Optional[str] = None):
             "fetched_at": datetime.utcnow().isoformat()
         }
         
+        logger.info(f"💾 Saving article to news file...")
         # Append to existing news file
         script_dir = os.path.dirname(os.path.abspath(__file__))
         base_dir = os.path.dirname(script_dir)
@@ -383,11 +413,12 @@ def add_custom_news(url: str, title: Optional[str] = None):
         with open(news_file, "w", encoding="utf-8") as f:
             json.dump(articles, f, indent=2)
         
-        print(f"Added custom article: {article_dict['title']}")
+        logger.info(f"✅ Successfully added custom article: {article_dict['title']}")
         return article_dict
         
     except Exception as e:
-        print(f"Failed to add custom news: {e}")
+        from backend.logger import logger
+        logger.error(f"❌ Failed to add custom news from {url}: {str(e)}", exc_info=True)
         return None
 
 

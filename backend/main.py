@@ -531,17 +531,24 @@ def generate_pil_from_payload(payload: CustomPILRequest):
 @app.post("/add-custom-news")
 def add_custom_news_endpoint(url: str = Query(...), title: str | None = Query(None)):
     """
-    Add a custom news article from a URL.
+    Add a custom news article from a URL with proper error handling.
     
     Args:
         url: URL of the article
         title: Optional custom title
     """
-    result = add_custom_news(url, title)
-    if result:
-        return {"success": True, "article": result}
-    else:
-        return {"success": False, "error": "Failed to fetch and parse the URL"}
+    try:
+        logger.info(f"📥 /add-custom-news endpoint called with URL: {url}")
+        result = add_custom_news(url, title)
+        if result:
+            logger.info(f"✅ Successfully added custom article via endpoint")
+            return {"success": True, "article": result}
+        else:
+            logger.error(f"❌ add_custom_news returned None")
+            return {"success": False, "error": "Failed to parse article content from URL"}
+    except Exception as e:
+        logger.error(f"❌ /add-custom-news error: {str(e)}", exc_info=True)
+        return {"success": False, "error": f"Error: {str(e)[:200]}"}
 
 
 @app.post("/refresh-news")
