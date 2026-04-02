@@ -113,6 +113,21 @@ async def startup_events():
     try:
         ensure_news_file_exists()
         logger.info("✅ News file initialized")
+        
+        # Check if news file is empty and auto-fetch if needed
+        news_file = get_news_file_path()
+        if os.path.exists(news_file):
+            with open(news_file, 'r') as f:
+                news_data = json.load(f)
+            
+            if not news_data or len(news_data) == 0:
+                logger.info("📥 News file empty - fetching initial news data...")
+                try:
+                    from backend.ingest_news_enhanced import fetch_news
+                    articles = fetch_news(days_back=1, max_per_feed=10)
+                    logger.info(f"✅ Auto-fetched {len(articles)} news articles on startup")
+                except Exception as fetch_err:
+                    logger.warning(f"⚠️ Auto-fetch failed (not critical): {str(fetch_err)}")
     except Exception as e:
         logger.error(f"❌ Failed to initialize news file: {e}")
     
@@ -354,6 +369,30 @@ def list_topics():
         for t in item.get("topics", []):
             topics.add(t)
     return {"topics": sorted(topics)}
+
+
+@app.get("/refresh-news")
+def refresh_news_data():
+    """Manually refresh news data from feeds."""
+    try:
+        logger.info("🔄 Manual refresh requested - fetching latest news...")
+        from backend.ingest_news_enhanced import fetch_news
+        
+        articles = fetch_news(days_back=1, max_per_feed=10)
+        logger.info(f"✅ Refreshed news: {len(articles)} articles fetched")
+        
+        return {
+            "success": True,
+            "message": f"Successfully fetched {len(articles)} news articles",
+            "article_count": len(articles)
+        }
+    except Exception as e:
+        logger.error(f"❌ News refresh failed: {str(e)}", exc_info=True)
+        return {
+            "success": False,
+            "message": f"Failed to refresh news: {str(e)}",
+            "error": str(e)
+        }
 
 
 # Signal-based timeouts don't work on Render's threaded environment
